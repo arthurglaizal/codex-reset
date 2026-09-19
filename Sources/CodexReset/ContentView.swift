@@ -115,8 +115,29 @@ struct ContentView: View {
             Text(L("距离 5 小时窗口重置", "until the 5h window resets"))
                 .font(.caption2)
                 .foregroundStyle(.secondary)
+            if model.autoMode != .off {
+                Label(L("自动继续在这个时刻触发", "Auto-continue fires at this reset"),
+                      systemImage: "bolt.fill")
+                    .font(.caption2)
+                    .foregroundStyle(highlightOrange)
+                    .padding(.top, 3)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// 周额度见底时，5 小时窗口重置也解不了锁，必须说清楚
+    @ViewBuilder
+    private func weeklyBlockWarning(_ weekly: RateLimitWindow?) -> some View {
+        let remaining = 100 - (weekly?.usedPercent ?? 0)
+        if remaining < 10 {
+            Label(L("周额度只剩 \(remaining)%，5 小时窗口重置也无法继续",
+                    "Only \(remaining)% weekly quota left, so the 5h reset will not unblock anything."),
+                  systemImage: "exclamationmark.triangle.fill")
+                .font(.caption2)
+                .foregroundStyle(quotaColor(remaining))
+                .fixedSize(horizontal: false, vertical: true)
+        }
     }
 
     /// 用量历史：5 小时窗口时间线
@@ -278,9 +299,12 @@ struct ContentView: View {
         VStack(alignment: .leading, spacing: 8) {
             if let rl = model.rateLimits {
                 HStack(alignment: .top, spacing: 12) {
-                    quotaGauge(title: L("5小时", "5h"), window: rl.rateLimits.primary)
-                    quotaGauge(title: L("1周", "1 week"), window: rl.rateLimits.secondary)
+                    quotaGauge(title: L("5小时", "5h"),
+                               window: rl.rateLimits.primary, primary: true)
+                    quotaGauge(title: L("1周", "1 week"),
+                               window: rl.rateLimits.secondary, primary: false)
                 }
+                weeklyBlockWarning(rl.rateLimits.secondary)
                 HStack {
                     Text(L("计划：", "Plan: ") + (rl.rateLimits.planType ?? "?"))
                     Spacer()
@@ -301,12 +325,12 @@ struct ContentView: View {
 
     /// 竖向量表，显示**剩余**额度（与 Codex 侧边栏口径一致）：
     /// 柱子满=额度充足，见底=快用光。
-    private func quotaGauge(title: String, window: RateLimitWindow?) -> some View {
+    private func quotaGauge(title: String, window: RateLimitWindow?, primary: Bool) -> some View {
         let remaining = max(0, min(100, 100 - (window?.usedPercent ?? 0)))
         let tint = quotaColor(remaining)
         return VStack(spacing: 5) {
             Text("\(remaining)%")
-                .font(.system(size: 18, weight: .semibold, design: .rounded))
+                .font(.system(size: primary ? 20 : 15, weight: .semibold, design: .rounded))
                 .monospacedDigit()
                 .foregroundStyle(tint)
             GeometryReader { geo in
@@ -319,10 +343,19 @@ struct ContentView: View {
                         .frame(height: max(4, geo.size.height * CGFloat(remaining) / 100))
                 }
             }
-            .frame(height: 140)
-            Text(title)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            .frame(height: primary ? 140 : 104)
+            HStack(spacing: 3) {
+                if primary {
+                    // 自动继续跟的是这个窗口
+                    Image(systemName: "bolt.fill")
+                        .font(.system(size: 9))
+                        .foregroundStyle(highlightOrange)
+                }
+                Text(title)
+                    .font(.caption)
+                    .fontWeight(primary ? .semibold : .regular)
+                    .foregroundStyle(primary ? Color.primary : Color.secondary)
+            }
             Text(resetText(window))
                 .font(.system(size: 10))
                 .monospacedDigit()
@@ -332,7 +365,7 @@ struct ContentView: View {
                 .monospacedDigit()
                 .foregroundStyle(.secondary)
         }
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, alignment: .top)
         .help(L("剩余额度 \(remaining)%，\(resetText(window)) 重置",
                 "\(remaining)% left, resets at \(resetText(window))"))
     }
