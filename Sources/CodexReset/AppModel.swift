@@ -23,8 +23,17 @@ final class AppModel: ObservableObject {
     /// 勾选、需要在恢复后自动继续的对话
     @Published var selectedThreadIds: Set<String> = []
     @Published var logLines: [LogEntry] = []
-    @Published var autoContinue: Bool {
-        didSet { UserDefaults.standard.set(autoContinue, forKey: "autoContinue") }
+    /// 自动继续模式：三者互斥
+    enum AutoMode: String {
+        /// 不自动继续
+        case off
+        /// 用量恢复后只继续勾选的对话
+        case selected
+        /// 用量恢复后继续所有确实卡住的对话，无需勾选
+        case all
+    }
+    @Published var autoMode: AutoMode {
+        didSet { UserDefaults.standard.set(autoMode.rawValue, forKey: "autoMode") }
     }
     @Published var continueCommand: String {
         didSet { UserDefaults.standard.set(continueCommand, forKey: "continueCommand") }
@@ -60,7 +69,14 @@ final class AppModel: ObservableObject {
         self.manager = AppServerManager(codexHome: codexHome)
         self.reader = SQLiteReader(codexHome: codexHome)
         self.engine = AutoContinueEngine(codexHome: codexHome)
-        self.autoContinue = UserDefaults.standard.object(forKey: "autoContinue") as? Bool ?? true
+        if let raw = UserDefaults.standard.string(forKey: "autoMode"),
+           let mode = AutoMode(rawValue: raw) {
+            self.autoMode = mode
+        } else {
+            // 迁移旧的布尔开关：开=只继续勾选的，关=不自动继续
+            let legacy = UserDefaults.standard.object(forKey: "autoContinue") as? Bool ?? true
+            self.autoMode = legacy ? .selected : .off
+        }
         self.continueCommand = UserDefaults.standard.string(forKey: "continueCommand") ?? L("继续", "Continue")
         self.remoteControlEnabled = CodexConfig.load(codexHome: codexHome).remoteControlEnabled
         self.language = UserDefaults.standard.string(forKey: "language") ?? "system"
@@ -343,8 +359,13 @@ final class AppModel: ObservableObject {
         allThreads = reader.allThreads()
     }
 
-    /// 所有勾选的对话（暂停 + 全部，按 threadId 去重，保持最新在前）
-    private func selectedTargets() -> [PausedThread] {
+    /// 本次要继续的对话。
+    /// `.all` 模式无视勾选，直接取所有「暂停仍是最后一轮」的对话；
+    /// 其余模式沿用勾选列表（`立即继续` 按钮在 `.off` 下仍可手动触发）。
+    private func continueTargets() -> [PausedThread] {
+        if autoMode == .all {
+            return pausedThreads.filter(\.isStillPaused)
+        }
         var seen = Set<String>()
         var result: [PausedThread] = []
         for t in pausedThreads where selectedThreadIds.contains(t.threadId) {
@@ -376,11 +397,15 @@ final class AppModel: ObservableObject {
 
     /// 到点自动继续：对所有勾选的对话（暂停 + 全部）逐个发送「继续」
     func autoContinueIfNeeded() async {
-        guard autoContinue else { return }
+        guard autoMode != .off else { return }
         refreshPausedThreads()
-        let targets = selectedTargets()
+        let targets = continueTargets()
         guard !targets.isEmpty else {
-            appendLog("没有勾选的对话，跳过自动继续", "No chats selected; skipping auto-continue")
+            if autoMode == .all {
+                appendLog("没有卡住的对话，跳过自动继续", "No stuck chats; skipping auto-continue")
+            } else {
+                appendLog("没有勾选的对话，跳过自动继续", "No chats selected; skipping auto-continue")
+            }
             return
         }
         let primary = rateLimits?.rateLimits.primary
@@ -423,7 +448,7 @@ final class AppModel: ObservableObject {
     /// 手动立即继续：对所有勾选的对话（暂停 + 全部）执行继续
     func manualContinue() async {
         refreshPausedThreads()
-        let targets = selectedTargets()
+        let targets = continueTargets()
         guard !targets.isEmpty else {
             appendLog("没有勾选的对话", "No chats selected")
             return

@@ -362,7 +362,7 @@ struct ContentView: View {
     @ViewBuilder
     private var selectStuckButton: some View {
         let stuckIds = Set(stuckThreads.map { $0.threadId })
-        if !stuckIds.isEmpty {
+        if !stuckIds.isEmpty, model.autoMode != .all {
             Button(stuckIds.isSubset(of: model.selectedThreadIds)
                    ? L("取消全选", "Clear all")
                    : L("全选卡住的", "Select stuck")) {
@@ -479,7 +479,7 @@ struct ContentView: View {
                 accordionHeader(title: L("全部对话（\(model.allThreads.count)）",
                                          "All chats (\(model.allThreads.count))"),
                                 section: .all, isOpen: isOpen)
-                if isOpen, !model.allThreads.isEmpty {
+                if isOpen, !model.allThreads.isEmpty, model.autoMode != .all {
                     let allIds = Set(model.allThreads.map { $0.threadId })
                     Button(allIds.isSubset(of: model.selectedThreadIds)
                            ? L("取消全选", "Clear all")
@@ -501,61 +501,72 @@ struct ContentView: View {
         .frame(maxHeight: isOpen ? .infinity : nil, alignment: .top)
     }
 
+    /// 模式 `.all` 下勾选没有意义，直接去掉复选框只留内容
+    @ViewBuilder
     private func threadRow(_ paused: PausedThread, showRecovery: Bool) -> some View {
-        Toggle(isOn: Binding(
-            get: { model.selectedThreadIds.contains(paused.threadId) },
-            set: { on in
-                if on {
-                    model.selectedThreadIds.insert(paused.threadId)
-                } else {
-                    model.selectedThreadIds.remove(paused.threadId)
-                }
-            }
-        )) {
-            HStack(spacing: 6) {
-                if showRecovery {
-                    let label = paused.isStillPaused
-                        ? L("暂停仍是最后一轮，对话确实卡住",
-                            "The pause is the last message — this chat is really stuck")
-                        : L("失败之后对话已被继续过，无需再次继续",
-                            "The chat was continued after the pause — no need to resume it")
-                    Image(systemName: paused.isStillPaused ? stuckSymbol : resumedSymbol)
-                        .font(.caption)
-                        .foregroundStyle(paused.isStillPaused ? highlightOrange : Color.secondary)
-                        .help(label)
-                        .accessibilityLabel(label)
-                } else {
-                    Text("–")
-                        .foregroundStyle(.secondary)
-                }
-                Text(paused.title)
-                    .font(.system(size: 14))
-                    .lineLimit(1)
-                Spacer(minLength: 4)
-                if showRecovery {
-                    // 右列与指示图标同色：卡住显示恢复时间，已继续显示「已继续」
-                    if paused.isStillPaused, let hint = paused.recoveryHint {
-                        Text(cleanHint(hint))
-                            .font(.caption)
-                            .fontWeight(.semibold)
-                            .foregroundStyle(highlightOrange)
-                    } else if !paused.isStillPaused {
-                        Text(L("已继续", "Resumed"))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+        if model.autoMode == .all {
+            threadRowLabel(paused, showRecovery: showRecovery)
+                .padding(.leading, 3)
+        } else {
+            Toggle(isOn: Binding(
+                get: { model.selectedThreadIds.contains(paused.threadId) },
+                set: { on in
+                    if on {
+                        model.selectedThreadIds.insert(paused.threadId)
+                    } else {
+                        model.selectedThreadIds.remove(paused.threadId)
                     }
                 }
+            )) {
+                threadRowLabel(paused, showRecovery: showRecovery)
             }
-            // 已继续过的整行淡化，与卡住的拉开对比
-            .opacity(showRecovery && !paused.isStillPaused ? 0.55 : 1)
-            .contentShape(Rectangle())
-            // 双击在 Codex 中打开该对话
-            .onTapGesture(count: 2) {
-                model.openInCodex(threadId: paused.threadId)
-            }
-            .help(L("双击在 Codex 中打开该对话", "Double-click to open in Codex"))
+            .toggleStyle(.checkbox)
         }
-        .toggleStyle(.checkbox)
+    }
+
+    private func threadRowLabel(_ paused: PausedThread, showRecovery: Bool) -> some View {
+        HStack(spacing: 6) {
+            if showRecovery {
+                let label = paused.isStillPaused
+                    ? L("暂停仍是最后一轮，对话确实卡住",
+                        "The pause is the last message — this chat is really stuck")
+                    : L("失败之后对话已被继续过，无需再次继续",
+                        "The chat was continued after the pause — no need to resume it")
+                Image(systemName: paused.isStillPaused ? stuckSymbol : resumedSymbol)
+                    .font(.caption)
+                    .foregroundStyle(paused.isStillPaused ? highlightOrange : Color.secondary)
+                    .help(label)
+                    .accessibilityLabel(label)
+            } else {
+                Text("–")
+                    .foregroundStyle(.secondary)
+            }
+            Text(paused.title)
+                .font(.system(size: 14))
+                .lineLimit(1)
+            Spacer(minLength: 4)
+            if showRecovery {
+                // 右列与指示图标同色：卡住显示恢复时间，已继续显示「已继续」
+                if paused.isStillPaused, let hint = paused.recoveryHint {
+                    Text(cleanHint(hint))
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(highlightOrange)
+                } else if !paused.isStillPaused {
+                    Text(L("已继续", "Resumed"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        // 已继续过的整行淡化，与卡住的拉开对比
+        .opacity(showRecovery && !paused.isStillPaused ? 0.55 : 1)
+        .contentShape(Rectangle())
+        // 双击在 Codex 中打开该对话
+        .onTapGesture(count: 2) {
+            model.openInCodex(threadId: paused.threadId)
+        }
+        .help(L("双击在 Codex 中打开该对话", "Double-click to open in Codex"))
     }
 
     /// 去掉恢复提示末尾的句点，如 "7:27 PM." -> "7:27 PM"
@@ -586,23 +597,39 @@ struct ContentView: View {
             )
     }
 
+    /// 每种模式一句话说明，替代原来的固定副标题
+    private var autoModeExplanation: String {
+        switch model.autoMode {
+        case .off:
+            return L("用量恢复后不做任何事，只能手动点「立即继续」",
+                     "Nothing happens when usage resets — only the Continue Now button acts.")
+        case .selected:
+            return L("用量窗口重置后，自动把指令发送到已勾选的对话",
+                     "When the usage window resets, the command is sent to the chats you ticked.")
+        case .all:
+            return L("用量窗口重置后，自动继续所有卡住的对话，无需勾选",
+                     "When the usage window resets, every stuck chat is continued — no ticking needed.")
+        }
+    }
+
     private var controlsSection: some View {
         softCard {
-            // 主开关：用量恢复后自动继续
-            HStack(spacing: 10) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(L("用量恢复后自动继续", "Auto-continue after usage resets"))
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
-                    Text(L("用量窗口重置后，自动把指令发送到已勾选的对话",
-                           "When the usage window resets, the command is sent to all selected chats automatically."))
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
+            // 三种互斥模式：关 / 只继续勾选的 / 全部卡住的
+            VStack(alignment: .leading, spacing: 6) {
+                Text(L("用量恢复后自动继续", "Auto-continue after usage resets"))
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                Picker("", selection: $model.autoMode) {
+                    Text(L("关闭", "Off")).tag(AppModel.AutoMode.off)
+                    Text(L("已勾选", "Selected")).tag(AppModel.AutoMode.selected)
+                    Text(L("全部卡住的", "All stuck")).tag(AppModel.AutoMode.all)
                 }
-                Spacer()
-                Toggle("", isOn: $model.autoContinue)
-                    .labelsHidden()
-                    .toggleStyle(.switch)
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                Text(autoModeExplanation)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             Divider()
