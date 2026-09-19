@@ -32,12 +32,6 @@ struct ContentView: View {
         VStack(alignment: .leading, spacing: 12) {
             header
             Divider()
-            Picker("", selection: $selectedTab) {
-                Text(L("概览", "Overview")).tag(0)
-                Text(L("用量历史", "Usage History")).tag(1)
-                Text(L("日志", "Log")).tag(2)
-            }
-            .pickerStyle(.segmented)
             // Tab 内容占满剩余高度：顶部对齐，概览内「立即继续」卡片置底
             tabContent
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -200,6 +194,16 @@ struct ContentView: View {
                 .font(.headline)
                 .lineLimit(1)
             Spacer()
+            // Tab 切换移到标题栏，省下一整行高度给列表
+            Picker("", selection: $selectedTab) {
+                Text(L("概览", "Overview")).tag(0)
+                Text(L("用量历史", "Usage History")).tag(1)
+                Text(L("日志", "Log")).tag(2)
+            }
+            .pickerStyle(.segmented)
+            .frame(width: 330)
+            Spacer()
+                .frame(width: 4)
             // 右上角：设置（打开独立设置窗口）
             Button {
                 onOpenSettings?()
