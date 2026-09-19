@@ -23,6 +23,8 @@ struct ContentView: View {
     @State private var selectedTab = 0
     /// 是否在概览中显示「全部对话」模块
     @AppStorage("showAllThreads") private var showAllThreads = true
+    /// 自动继续的作用范围（关闭总开关后仍保留，重新打开时沿用）
+    @AppStorage("autoScopeAll") private var autoScopeAll = false
 
     init(onOpenSettings: (() -> Void)? = nil) {
         self.onOpenSettings = onOpenSettings
@@ -43,7 +45,11 @@ struct ContentView: View {
         // 浅色主题：全不透明浅色背景
         .background(Color(red: 0.95, green: 0.945, blue: 0.93))
         .preferredColorScheme(.light)
-        .onAppear { model.refreshAllThreads() }
+        .onAppear {
+            model.refreshAllThreads()
+            // 保存的模式是权威来源，启动时把范围开关对齐到它
+            if model.autoMode == .all { autoScopeAll = true }
+        }
     }
 
     @ViewBuilder
@@ -597,7 +603,28 @@ struct ContentView: View {
             )
     }
 
-    /// 每种模式一句话说明，替代原来的固定副标题
+    /// 总开关：关闭时记住上次的作用范围，重新打开后恢复
+    private var autoEnabledBinding: Binding<Bool> {
+        Binding(
+            get: { model.autoMode != .off },
+            set: { on in model.autoMode = on ? (autoScopeAll ? .all : .selected) : .off }
+        )
+    }
+
+    /// 作用范围：勾上=全部卡住的对话，不勾=只继续已勾选的
+    private var autoScopeBinding: Binding<Bool> {
+        Binding(
+            get: { autoScopeAll },
+            set: { all in
+                autoScopeAll = all
+                if model.autoMode != .off {
+                    model.autoMode = all ? .all : .selected
+                }
+            }
+        )
+    }
+
+    /// 当前设置的一句话说明
     private var autoModeExplanation: String {
         switch model.autoMode {
         case .off:
@@ -614,22 +641,25 @@ struct ContentView: View {
 
     private var controlsSection: some View {
         softCard {
-            // 三种互斥模式：关 / 只继续勾选的 / 全部卡住的
-            VStack(alignment: .leading, spacing: 6) {
-                Text(L("用量恢复后自动继续", "Auto-continue after usage resets"))
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-                Picker("", selection: $model.autoMode) {
-                    Label(L("关闭", "Off"), systemImage: "power")
-                        .tag(AppModel.AutoMode.off)
-                    Label(L("已勾选", "Selected"), systemImage: "checkmark.square")
-                        .tag(AppModel.AutoMode.selected)
-                    Label(L("全部卡住的", "All stuck"), systemImage: "bolt.fill")
-                        .tag(AppModel.AutoMode.all)
+            // 总开关 + 作用范围复选框（三种模式互斥，但拆成「开关」与「范围」更易读）
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 10) {
+                    Label(L("用量恢复后自动继续", "Auto-continue after usage resets"),
+                          systemImage: "bolt.fill")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                    Spacer()
+                    Toggle("", isOn: autoEnabledBinding)
+                        .labelsHidden()
+                        .toggleStyle(.switch)
                 }
-                .pickerStyle(.segmented)
-                .labelStyle(.titleAndIcon)
-                .labelsHidden()
+                Toggle(isOn: autoScopeBinding) {
+                    Text(L("包含全部卡住的对话，无需勾选",
+                           "Every stuck chat, no ticking needed"))
+                        .font(.caption)
+                }
+                .toggleStyle(.checkbox)
+                .disabled(model.autoMode == .off)
                 Text(autoModeExplanation)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
