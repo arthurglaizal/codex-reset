@@ -2,6 +2,10 @@ import SwiftUI
 
 /// 强调橙：浅色主题下的主色（按钮/恢复时间高亮），保证白字按钮对比与文字可读
 private let highlightOrange = Color(red: 0.72, green: 0.33, blue: 0.10)
+/// 柱子本体的高度，刻度和分隔线都按它对齐
+private let gaugeBarHeight: CGFloat = 128
+/// 柱子上方（标题 + 百分比）占用的高度
+private let gaugeHeaderHeight: CGFloat = 47
 /// 暂停仍是最后一轮（确实卡住）
 private let stuckSymbol = "pause.circle.fill"
 /// 失败之后对话已被继续过
@@ -211,13 +215,30 @@ struct ContentView: View {
     /// 底部：辅助功能状态（左）+ 退出（右）
     private var footer: some View {
         HStack(spacing: 8) {
+            Text(L("配置：", "Configuration:"))
+                .foregroundStyle(.secondary)
+
+            // 用量状态（原来占着标题栏，实际是运行状态而非标题）
+            Circle()
+                .fill(statusColor)
+                .frame(width: 7, height: 7)
+            Text(statusText)
+                .help(L("与 Codex 的连接与当前用量状态",
+                        "Connection to Codex and current usage state"))
+
+            Text("·").foregroundStyle(.tertiary)
+
             if model.accessibilityAuthorized {
                 Label(L("辅助功能已授权", "Accessibility granted"), systemImage: "checkmark.circle.fill")
                     .foregroundStyle(.green)
+                    .help(L("GUI 兜底通道可用：无法走本地协议时改为模拟键盘输入",
+                            "The GUI fallback can type into Codex when the local protocol is unavailable"))
             } else {
                 Label(L("辅助功能未授权", "Accessibility not granted"),
                       systemImage: "exclamationmark.triangle.fill")
                     .foregroundStyle(.orange)
+                    .help(L("未授权时只能走本地协议通道",
+                            "Without it, only the local protocol channel can be used"))
                 Button(L("授权", "Grant")) {
                     model.openAccessibilitySettings()
                 }
@@ -238,10 +259,7 @@ struct ContentView: View {
 
     private var header: some View {
         HStack(spacing: 8) {
-            Circle()
-                .fill(statusColor)
-                .frame(width: 8, height: 8)
-            Text(statusText)
+            Text("CodexReset")
                 .font(.headline)
                 .lineLimit(1)
             Spacer()
@@ -297,9 +315,13 @@ struct ContentView: View {
     private var usageSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             if let rl = model.rateLimits {
-                HStack(alignment: .top, spacing: 12) {
+                HStack(alignment: .top, spacing: 10) {
+                    gaugeScale
                     quotaGauge(title: L("5小时", "5h"),
                                window: rl.rateLimits.primary, primary: true)
+                    Divider()
+                        .frame(height: gaugeBarHeight)
+                        .padding(.top, gaugeHeaderHeight)
                     quotaGauge(title: L("1周", "1 week"),
                                window: rl.rateLimits.secondary, primary: false)
                 }
@@ -327,45 +349,55 @@ struct ContentView: View {
     private func quotaGauge(title: String, window: RateLimitWindow?, primary: Bool) -> some View {
         let remaining = max(0, min(100, 100 - (window?.usedPercent ?? 0)))
         let tint = quotaColor(remaining)
-        return VStack(spacing: 5) {
-            Text("\(remaining)%")
-                .font(.system(size: 18, weight: .semibold, design: .rounded))
-                .monospacedDigit()
-                .foregroundStyle(tint)
-            GeometryReader { geo in
-                ZStack(alignment: .bottom) {
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .fill(Color.black.opacity(0.06))
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .fill(LinearGradient(colors: [tint, tint.opacity(0.7)],
-                                             startPoint: .bottom, endPoint: .top))
-                        .frame(height: max(4, geo.size.height * CGFloat(remaining) / 100))
-                }
-            }
-            .frame(width: 54, height: 128)
+        return VStack(spacing: 4) {
             HStack(spacing: 3) {
                 if primary {
-                    // 自动继续跟的是这个窗口，只用图标提示，不改变柱子比例
+                    // 自动继续跟的是这个窗口
                     Image(systemName: "bolt.fill")
-                        .font(.system(size: 9))
+                        .font(.system(size: 11))
                         .foregroundStyle(highlightOrange)
                 }
                 Text(title)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 14, weight: .semibold))
             }
+            Text("\(remaining)%")
+                .font(.system(size: 20, weight: .semibold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(tint)
+            ZStack(alignment: .bottom) {
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(Color.black.opacity(0.06))
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(tint)
+                    .frame(height: max(4, gaugeBarHeight * CGFloat(remaining) / 100))
+            }
+            .frame(width: 54, height: gaugeBarHeight)
             Text(resetText(window))
-                .font(.system(size: 10))
+                .font(.system(size: 11))
                 .monospacedDigit()
                 .foregroundStyle(.tertiary)
             Text(remainingText(window))
-                .font(.system(size: 11, weight: .medium))
+                .font(.system(size: 13, weight: .medium))
                 .monospacedDigit()
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .top)
         .help(L("剩余额度 \(remaining)%，\(resetText(window)) 重置",
                 "\(remaining)% left, resets at \(resetText(window))"))
+    }
+
+    /// 柱子两端的刻度，只对齐柱子本身的高度
+    private var gaugeScale: some View {
+        VStack(alignment: .trailing, spacing: 0) {
+            Text("100%")
+            Spacer(minLength: 0)
+            Text("0%")
+        }
+        .font(.system(size: 9))
+        .monospacedDigit()
+        .foregroundStyle(.tertiary)
+        .frame(height: gaugeBarHeight)
+        .padding(.top, gaugeHeaderHeight)
     }
 
     /// 剩余额度配色：充足=绿，低于 30%=橙，低于 10%=红
@@ -761,13 +793,16 @@ struct ContentView: View {
 
             // 总开关 + 作用范围复选框（三种模式互斥，但拆成「开关」与「范围」更易读）
             VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 10) {
-                    Label(L("用量恢复后自动继续（5 小时窗口）",
-                            "Auto-continue after usage resets (5h reset)"),
-                          systemImage: "bolt.fill")
+                HStack(alignment: .top, spacing: 10) {
+                    // Label tronque le texte dans un HStack contraint : on le compose a la main
+                    Image(systemName: "bolt.fill")
+                        .font(.subheadline)
+                    Text(L("用量恢复后自动继续（5 小时窗口）",
+                           "Auto-continue after usage resets (5h reset)"))
                         .font(.subheadline)
                         .fontWeight(.semibold)
-                    Spacer()
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 4)
                     Toggle("", isOn: autoEnabledBinding)
                         .labelsHidden()
                         .toggleStyle(.switch)

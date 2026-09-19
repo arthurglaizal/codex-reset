@@ -64,32 +64,45 @@ final class MenuBarController: NSObject {
             button.image = nil
             switch model.connectionMode {
             case "none":
-                button.title = "Codex ⚠️"
+                button.attributedTitle = stackedTitle(top: "codex", bottom: "⚠️")
             default:
-                button.title = "Codex…"
+                button.attributedTitle = stackedTitle(top: "codex", bottom: "…")
             }
             return
         }
 
-        let used = primary.usedPercent
-        if used >= 100 {
-            // 已到上限：红色满环 + 恢复倒计时
-            button.image = usageRingImage(percent: used)
-            if let countdown = model.countdownText() {
-                button.title = "⏳ \(countdown)"
-            } else {
-                button.title = "⏳ " + L("已到上限", "limit reached")
-            }
+        // 与面板口径一致：显示**剩余**额度，不是已用
+        let remaining = max(0, min(100, 100 - primary.usedPercent))
+        button.image = usageRingImage(remaining: remaining)
+        if remaining == 0, let countdown = model.countdownText() {
+            button.attributedTitle = stackedTitle(top: "codex", bottom: "⏳ \(countdown)")
         } else {
-            // 正常：用量进度环 + 百分比
-            button.image = usageRingImage(percent: used)
-            button.title = "\(used)%"
+            button.attributedTitle = stackedTitle(top: "codex", bottom: "\(remaining)%")
         }
     }
 
-    /// 绘制用量进度环（深/浅菜单栏均清晰）：灰底环 + 彩色用量弧
-    private func usageRingImage(percent: Int) -> NSImage {
-        let pct = min(max(percent, 0), 100)
+    /// 两行标题：上面小字「codex」，下面是剩余额度
+    private func stackedTitle(top: String, bottom: String) -> NSAttributedString {
+        let style = NSMutableParagraphStyle()
+        style.alignment = .center
+        style.lineSpacing = -2
+        let result = NSMutableAttributedString()
+        result.append(NSAttributedString(string: top + "\n", attributes: [
+            .font: NSFont.systemFont(ofSize: 8, weight: .medium),
+            .foregroundColor: NSColor.secondaryLabelColor,
+            .paragraphStyle: style
+        ]))
+        result.append(NSAttributedString(string: bottom, attributes: [
+            .font: NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .semibold),
+            .foregroundColor: NSColor.labelColor,
+            .paragraphStyle: style
+        ]))
+        return result
+    }
+
+    /// 绘制剩余额度环（深/浅菜单栏均清晰）：灰底环 + 彩色剩余弧，弧越短越紧张
+    private func usageRingImage(remaining: Int) -> NSImage {
+        let pct = min(max(remaining, 0), 100)
         // 2 倍尺寸绘制，缩小后更锐利
         let backing = NSImage(size: NSSize(width: 36, height: 36))
         backing.lockFocus()
@@ -103,9 +116,9 @@ final class MenuBarController: NSObject {
         track.stroke()
 
         if pct > 0 {
-            let arcColor: NSColor = pct >= 100
+            let arcColor: NSColor = pct < 10
                 ? .systemRed
-                : (pct >= 80 ? .systemOrange : .systemGreen)
+                : (pct < 30 ? .systemOrange : .systemGreen)
             let frac = CGFloat(pct) / 100.0
             let arc = NSBezierPath()
             arc.lineWidth = lineWidth
