@@ -2,6 +2,10 @@ import SwiftUI
 
 /// 强调橙：浅色主题下的主色（按钮/恢复时间高亮），保证白字按钮对比与文字可读
 private let highlightOrange = Color(red: 0.72, green: 0.33, blue: 0.10)
+/// 暂停仍是最后一轮（确实卡住）
+private let stuckSymbol = "pause.circle.fill"
+/// 失败之后对话已被继续过
+private let resumedSymbol = "checkmark.circle"
 
 /// 主面板：单屏展示用量、倒计时、暂停对话与操作（浅色轻拟物主题）
 struct ContentView: View {
@@ -277,31 +281,59 @@ struct ContentView: View {
         return order
     }
 
+    /// 图例：说明橙/灰两种状态，放在列表上方（提示气泡承载不了这条关键信息）
+    private var pausedLegend: some View {
+        let stuck = model.pausedThreads.filter(\.isStillPaused).count
+        let resumed = model.pausedThreads.count - stuck
+        return HStack(spacing: 10) {
+            Label {
+                Text(L("\(stuck) 个等待用量恢复", "\(stuck) waiting for reset"))
+            } icon: {
+                Image(systemName: stuckSymbol).foregroundStyle(highlightOrange)
+            }
+            if resumed > 0 {
+                Text("·").foregroundStyle(.tertiary)
+                Label {
+                    Text(L("\(resumed) 个已被继续过", "\(resumed) resumed since"))
+                } icon: {
+                    Image(systemName: resumedSymbol).foregroundStyle(.secondary)
+                }
+            }
+        }
+        .font(.caption2)
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, 18)
+    }
+
+    /// 项目内排序：确实卡住的在前，其余保持原有「最新在前」顺序
+    private func stuckFirst(_ threads: [PausedThread]) -> [PausedThread] {
+        threads.filter(\.isStillPaused) + threads.filter { !$0.isStillPaused }
+    }
+
     private var pausedSection: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
-                let stuckCount = model.pausedThreads.filter(\.isStillPaused).count
-                Text(L("暂停的对话（\(stuckCount)/\(model.pausedThreads.count)）",
-                       "Paused chats (\(stuckCount)/\(model.pausedThreads.count))"))
+                Text(L("暂停的对话（\(model.pausedThreads.count)）",
+                       "Paused chats (\(model.pausedThreads.count))"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                    .help(L("橙点为确实卡住的对话；灰点的对话在失败之后已被继续过",
-                            "Orange dots are really stuck; grey ones were continued after the failure"))
                 Spacer()
-                if !model.pausedThreads.isEmpty {
-                    let pausedIds = Set(model.pausedThreads.map { $0.threadId })
-                    Button(pausedIds.isSubset(of: model.selectedThreadIds)
+                // 全选只勾选确实卡住的对话：已被继续过的无需再次继续
+                let stuckIds = Set(model.pausedThreads.filter(\.isStillPaused).map { $0.threadId })
+                if !stuckIds.isEmpty {
+                    Button(stuckIds.isSubset(of: model.selectedThreadIds)
                            ? L("取消全选", "Clear all")
-                           : L("全选", "Select all")) {
-                        if pausedIds.isSubset(of: model.selectedThreadIds) {
-                            model.selectedThreadIds.subtract(pausedIds)
+                           : L("全选卡住的", "Select stuck")) {
+                        if stuckIds.isSubset(of: model.selectedThreadIds) {
+                            model.selectedThreadIds.subtract(stuckIds)
                         } else {
-                            model.selectedThreadIds.formUnion(pausedIds)
+                            model.selectedThreadIds.formUnion(stuckIds)
                         }
                     }
                     .font(.caption)
                 }
             }
+            pausedLegend
             if model.pausedThreads.isEmpty {
                 Text(L("未找到因用量暂停的对话", "No usage-paused chats found"))
                     .font(.caption)
@@ -313,7 +345,7 @@ struct ContentView: View {
                         .frame(width: 88, alignment: .leading)
                     Text(L("对话", "Chat"))
                     Spacer()
-                    Text(L("恢复时间", "Recovery"))
+                    Text(L("状态", "Status"))
                         .frame(width: 74, alignment: .trailing)
                 }
                 .font(.caption2)
@@ -328,7 +360,8 @@ struct ContentView: View {
                                     .font(.caption)
                                     .fontWeight(.semibold)
                                     .foregroundStyle(.secondary)
-                                ForEach(group.threads, id: \.threadId) { paused in
+                                // 确实卡住的排在项目内的前面
+                                ForEach(stuckFirst(group.threads), id: \.threadId) { paused in
                                     threadRow(paused, showRecovery: true)
                                 }
                             }
@@ -416,15 +449,16 @@ struct ContentView: View {
         )) {
             HStack(spacing: 6) {
                 if showRecovery {
-                    // 橙点=暂停仍是最后一轮（确实卡住）；灰点=之后已被继续过
-                    Circle()
-                        .fill(paused.isStillPaused ? highlightOrange : Color.secondary.opacity(0.3))
-                        .frame(width: 7, height: 7)
-                        .help(paused.isStillPaused
-                              ? L("暂停仍是最后一轮，对话确实卡住",
-                                  "The pause is still the last turn — this chat is really stuck")
-                              : L("失败之后对话已被继续过，无需再次继续",
-                                  "The chat was continued after the failure — no need to resume it"))
+                    let label = paused.isStillPaused
+                        ? L("暂停仍是最后一轮，对话确实卡住",
+                            "The pause is the last message — this chat is really stuck")
+                        : L("失败之后对话已被继续过，无需再次继续",
+                            "The chat was continued after the pause — no need to resume it")
+                    Image(systemName: paused.isStillPaused ? stuckSymbol : resumedSymbol)
+                        .font(.caption)
+                        .foregroundStyle(paused.isStillPaused ? highlightOrange : Color.secondary)
+                        .help(label)
+                        .accessibilityLabel(label)
                 } else {
                     Text("–")
                         .foregroundStyle(.secondary)
@@ -433,13 +467,22 @@ struct ContentView: View {
                     .font(.subheadline)
                     .lineLimit(1)
                 Spacer(minLength: 4)
-                if showRecovery, let hint = paused.recoveryHint {
-                    Text(cleanHint(hint))
-                        .font(.caption)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(highlightOrange)
+                if showRecovery {
+                    // 右列与指示图标同色：卡住显示恢复时间，已继续显示「已继续」
+                    if paused.isStillPaused, let hint = paused.recoveryHint {
+                        Text(cleanHint(hint))
+                            .font(.caption)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(highlightOrange)
+                    } else if !paused.isStillPaused {
+                        Text(L("已继续", "Resumed"))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
+            // 已继续过的整行淡化，与卡住的拉开对比
+            .opacity(showRecovery && !paused.isStillPaused ? 0.55 : 1)
             .contentShape(Rectangle())
             // 双击在 Codex 中打开该对话
             .onTapGesture(count: 2) {
