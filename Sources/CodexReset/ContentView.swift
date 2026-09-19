@@ -364,21 +364,31 @@ struct ContentView: View {
         )
     }
 
-    /// 只勾选确实卡住的对话：已被继续过的无需再次继续
+    /// 「全选」主复选框：空 / 半选 / 全选，与下方每行的复选框同列
     @ViewBuilder
-    private var selectStuckButton: some View {
-        let stuckIds = Set(stuckThreads.map { $0.threadId })
-        if !stuckIds.isEmpty, model.autoMode != .all {
-            Button(stuckIds.isSubset(of: model.selectedThreadIds)
-                   ? L("取消全选", "Clear all")
-                   : L("全选卡住的", "Select stuck")) {
-                if stuckIds.isSubset(of: model.selectedThreadIds) {
-                    model.selectedThreadIds.subtract(stuckIds)
+    private var selectAllCheckbox: some View {
+        let ids = Set(stuckThreads.map { $0.threadId })
+        if !ids.isEmpty, model.autoMode != .all {
+            let selected = ids.intersection(model.selectedThreadIds)
+            let isAll = selected.count == ids.count
+            Button {
+                if isAll {
+                    model.selectedThreadIds.subtract(ids)
                 } else {
-                    model.selectedThreadIds.formUnion(stuckIds)
+                    model.selectedThreadIds.formUnion(ids)
                 }
+            } label: {
+                Image(systemName: isAll ? "checkmark.square.fill"
+                                : (selected.isEmpty ? "square" : "minus.square.fill"))
+                    .font(.system(size: 16))
+                    .foregroundStyle(selected.isEmpty ? Color.secondary : Color.accentColor)
             }
-            .font(.caption)
+            .buttonStyle(.plain)
+            .help(isAll
+                  ? L("取消全选", "Clear selection")
+                  : L("全选卡住的对话（\(selected.count)/\(ids.count) 已选）",
+                      "Select all stuck chats (\(selected.count)/\(ids.count) selected)"))
+            .accessibilityLabel(L("全选卡住的对话", "Select all stuck chats"))
         }
     }
 
@@ -413,8 +423,8 @@ struct ContentView: View {
                             section: .paused, isOpen: isOpen)
             if isOpen {
                 HStack(spacing: 8) {
+                    selectAllCheckbox
                     searchField
-                    selectStuckButton
                 }
                 if stuckThreads.isEmpty {
                     Text(L("未找到因用量暂停的对话", "No usage-paused chats found"))
