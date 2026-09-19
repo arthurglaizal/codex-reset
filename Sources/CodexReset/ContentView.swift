@@ -44,7 +44,7 @@ struct ContentView: View {
             footer
         }
         .padding(14)
-        .frame(width: 380, height: 720, alignment: .top)
+        .frame(width: 600, height: 760, alignment: .top)
         // 浅色主题：全不透明浅色背景
         .background(Color(red: 0.95, green: 0.945, blue: 0.93))
         .preferredColorScheme(.light)
@@ -281,28 +281,61 @@ struct ContentView: View {
         return order
     }
 
-    /// 图例：说明橙/灰两种状态，放在列表上方（提示气泡承载不了这条关键信息）
+    /// 状态标签：圆角色块（图标+文字），比纯色小圆点易读得多
+    private func statusTag(symbol: String, text: String, tint: Color) -> some View {
+        HStack(spacing: 5) {
+            Image(systemName: symbol)
+                .font(.system(size: 11, weight: .semibold))
+            Text(text)
+                .font(.system(size: 12, weight: .medium))
+        }
+        .foregroundStyle(tint)
+        .padding(.horizontal, 9)
+        .padding(.vertical, 4)
+        .background(
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .fill(tint.opacity(0.12))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .strokeBorder(tint.opacity(0.22), lineWidth: 1)
+        )
+    }
+
+    /// 图例：两个状态标签 +「全选卡住的」按钮（关键信息不适合只放在提示气泡里）
     private var pausedLegend: some View {
         let stuck = model.pausedThreads.filter(\.isStillPaused).count
         let resumed = model.pausedThreads.count - stuck
-        return HStack(spacing: 10) {
-            Label {
-                Text(L("\(stuck) 个等待用量恢复", "\(stuck) waiting for reset"))
-            } icon: {
-                Image(systemName: stuckSymbol).foregroundStyle(highlightOrange)
-            }
+        return HStack(spacing: 8) {
+            statusTag(symbol: stuckSymbol,
+                      text: L("\(stuck) 个等待恢复", "\(stuck) waiting for reset"),
+                      tint: highlightOrange)
             if resumed > 0 {
-                Text("·").foregroundStyle(.tertiary)
-                Label {
-                    Text(L("\(resumed) 个已被继续过", "\(resumed) resumed since"))
-                } icon: {
-                    Image(systemName: resumedSymbol).foregroundStyle(.secondary)
+                statusTag(symbol: resumedSymbol,
+                          text: L("\(resumed) 个已继续", "\(resumed) resumed since"),
+                          tint: Color.secondary)
+            }
+            Spacer()
+            selectStuckButton
+        }
+    }
+
+    /// 只勾选确实卡住的对话：已被继续过的无需再次继续
+    @ViewBuilder
+    private var selectStuckButton: some View {
+        let stuckIds = Set(model.pausedThreads.filter(\.isStillPaused).map { $0.threadId })
+        if !stuckIds.isEmpty {
+            Button(stuckIds.isSubset(of: model.selectedThreadIds)
+                   ? L("取消全选", "Clear all")
+                   : L("全选卡住的", "Select stuck")) {
+                if stuckIds.isSubset(of: model.selectedThreadIds) {
+                    model.selectedThreadIds.subtract(stuckIds)
+                } else {
+                    model.selectedThreadIds.formUnion(stuckIds)
                 }
             }
+            .font(.caption)
         }
-        .font(.caption2)
-        .foregroundStyle(.secondary)
-        .padding(.horizontal, 18)
     }
 
     /// 项目内排序：确实卡住的在前，其余保持原有「最新在前」顺序
@@ -312,27 +345,9 @@ struct ContentView: View {
 
     private var pausedSection: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text(L("暂停的对话（\(model.pausedThreads.count)）",
-                       "Paused chats (\(model.pausedThreads.count))"))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Spacer()
-                // 全选只勾选确实卡住的对话：已被继续过的无需再次继续
-                let stuckIds = Set(model.pausedThreads.filter(\.isStillPaused).map { $0.threadId })
-                if !stuckIds.isEmpty {
-                    Button(stuckIds.isSubset(of: model.selectedThreadIds)
-                           ? L("取消全选", "Clear all")
-                           : L("全选卡住的", "Select stuck")) {
-                        if stuckIds.isSubset(of: model.selectedThreadIds) {
-                            model.selectedThreadIds.subtract(stuckIds)
-                        } else {
-                            model.selectedThreadIds.formUnion(stuckIds)
-                        }
-                    }
-                    .font(.caption)
-                }
-            }
+            Text(L("暂停的对话（\(model.pausedThreads.count)）",
+                   "Paused chats (\(model.pausedThreads.count))"))
+                .font(.system(size: 15, weight: .semibold))
             pausedLegend
             if model.pausedThreads.isEmpty {
                 Text(L("未找到因用量暂停的对话", "No usage-paused chats found"))
@@ -464,7 +479,7 @@ struct ContentView: View {
                         .foregroundStyle(.secondary)
                 }
                 Text(paused.title)
-                    .font(.subheadline)
+                    .font(.system(size: 14))
                     .lineLimit(1)
                 Spacer(minLength: 4)
                 if showRecovery {
