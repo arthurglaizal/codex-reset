@@ -20,6 +20,8 @@ struct SettingsPanelView: View {
         .padding(16)
         .frame(width: 340)
         .background(Color(red: 0.95, green: 0.945, blue: 0.93))
+        // 与主面板一致强制浅色：配色为固定浅色，跟随系统深色会出现白字白底
+        .preferredColorScheme(.light)
     }
 
     /// 语言选择绑定到 AppModel.language（切换后经 objectWillChange 刷新全界面）

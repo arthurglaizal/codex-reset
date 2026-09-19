@@ -169,6 +169,8 @@ final class MenuBarController: NSObject {
             win.styleMask = [.titled, .closable, .utilityWindow]
             win.isReleasedWhenClosed = false
             win.isMovableByWindowBackground = true
+            // 窗口外观固定浅色，避免标题栏与浅色内容不一致
+            win.appearance = NSAppearance(named: .aqua)
             settingsWindow = win
         }
         guard let win = settingsWindow else { return }
