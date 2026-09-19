@@ -435,7 +435,7 @@ struct ContentView: View {
                             section: .continued, isOpen: isOpen)
             if isOpen {
                 Text(L("这些对话在触发用量上限后又被继续过，无需再次继续",
-                       "These chats were continued after hitting the limit — they don't need resuming."))
+                       "These chats were continued after hitting the limit. They don't need resuming."))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 if continuedThreads.isEmpty {
@@ -529,9 +529,9 @@ struct ContentView: View {
             if showRecovery {
                 let label = paused.isStillPaused
                     ? L("暂停仍是最后一轮，对话确实卡住",
-                        "The pause is the last message — this chat is really stuck")
+                        "The pause is the last message, so this chat is really stuck")
                     : L("失败之后对话已被继续过，无需再次继续",
-                        "The chat was continued after the pause — no need to resume it")
+                        "The chat was continued after the pause, so it needs nothing")
                 Image(systemName: paused.isStillPaused ? stuckSymbol : resumedSymbol)
                     .font(.caption)
                     .foregroundStyle(paused.isStillPaused ? highlightOrange : Color.secondary)
@@ -602,13 +602,13 @@ struct ContentView: View {
         switch model.autoMode {
         case .off:
             return L("用量恢复后不做任何事，只能手动点「立即继续」",
-                     "Nothing happens when usage resets — only the Continue Now button acts.")
+                     "Nothing happens when usage resets. Only the Continue Now button acts.")
         case .selected:
             return L("用量窗口重置后，自动把指令发送到已勾选的对话",
                      "When the usage window resets, the command is sent to the chats you ticked.")
         case .all:
             return L("用量窗口重置后，自动继续所有卡住的对话，无需勾选",
-                     "When the usage window resets, every stuck chat is continued — no ticking needed.")
+                     "When the usage window resets, every stuck chat is continued. No ticking needed.")
         }
     }
 
@@ -620,11 +620,15 @@ struct ContentView: View {
                     .font(.subheadline)
                     .fontWeight(.semibold)
                 Picker("", selection: $model.autoMode) {
-                    Text(L("关闭", "Off")).tag(AppModel.AutoMode.off)
-                    Text(L("已勾选", "Selected")).tag(AppModel.AutoMode.selected)
-                    Text(L("全部卡住的", "All stuck")).tag(AppModel.AutoMode.all)
+                    Label(L("关闭", "Off"), systemImage: "power")
+                        .tag(AppModel.AutoMode.off)
+                    Label(L("已勾选", "Selected"), systemImage: "checkmark.square")
+                        .tag(AppModel.AutoMode.selected)
+                    Label(L("全部卡住的", "All stuck"), systemImage: "bolt.fill")
+                        .tag(AppModel.AutoMode.all)
                 }
                 .pickerStyle(.segmented)
+                .labelStyle(.titleAndIcon)
                 .labelsHidden()
                 Text(autoModeExplanation)
                     .font(.caption2)
