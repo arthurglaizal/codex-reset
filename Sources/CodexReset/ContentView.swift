@@ -90,33 +90,39 @@ struct ContentView: View {
             Text(L("剩余额度", "Quota left"))
                 .font(.subheadline)
                 .fontWeight(.semibold)
-            // 整张卡片每 30 秒重绘，两个柱子下面的倒计时才会走
+            // 每 30 秒重绘，柱子下面的倒计时才会走
             TimelineView(.periodic(from: .now, by: 30)) { _ in
-                VStack(alignment: .leading, spacing: 10) {
-                    resetCountdown
-                    Divider()
-                        .overlay(Color.black.opacity(0.05))
-                    usageSection
-                }
+                usageSection
             }
         }
     }
 
     /// 距离 5 小时窗口重置的大号倒计时。
     /// 用 TimelineView 每 30 秒自刷新，不依赖用量轮询的节奏。
+    /// 倒计时有两种含义：额度用光时它是「还要等多久才能动」，
+    /// 额度还有时它只是当前窗口的剩余时间，所以配色和文案都跟着变。
     private var resetCountdown: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text(model.countdownText() ?? "…")
-                .font(.system(size: 32, weight: .semibold, design: .rounded))
-                .monospacedDigit()
-                .foregroundStyle(highlightOrange)
-                .lineLimit(1)
-                .minimumScaleFactor(0.6)
-            Text(L("距离 5 小时窗口重置", "until the 5h window resets"))
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+        let blocked = (model.rateLimits?.rateLimits.primary?.usedPercent ?? 0) >= 100
+        let tint = blocked ? highlightOrange : Color.secondary
+        return HStack(alignment: .center, spacing: 8) {
+            Image(systemName: blocked ? "hourglass" : "clock")
+                .font(.system(size: 16))
+                .foregroundStyle(tint)
+            VStack(alignment: .leading, spacing: 0) {
+                Text(model.countdownText() ?? "…")
+                    .font(.system(size: 26, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(tint)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                Text(blocked
+                     ? L("之后对话才能继续", "until your chats can resume")
+                     : L("当前 5 小时窗口剩余时间", "left in the current 5h window"))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 0)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     /// 周额度见底时，5 小时窗口重置也解不了锁，必须说清楚
@@ -336,7 +342,7 @@ struct ContentView: View {
                         .frame(height: max(4, geo.size.height * CGFloat(remaining) / 100))
                 }
             }
-            .frame(height: 140)
+            .frame(width: 54, height: 128)
             HStack(spacing: 3) {
                 if primary {
                     // 自动继续跟的是这个窗口，只用图标提示，不改变柱子比例
@@ -747,6 +753,12 @@ struct ContentView: View {
 
     private var controlsSection: some View {
         softCard {
+            TimelineView(.periodic(from: .now, by: 30)) { _ in
+                resetCountdown
+            }
+            Divider()
+                .overlay(Color.black.opacity(0.05))
+
             // 总开关 + 作用范围复选框（三种模式互斥，但拆成「开关」与「范围」更易读）
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 10) {
