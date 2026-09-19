@@ -87,7 +87,7 @@ struct ContentView: View {
     /// 用量分析卡片：大号倒计时 + 原顶部的用量条
     private var analyticsCard: some View {
         softCard {
-            Text(L("用量分析", "Analytics"))
+            Text(L("剩余额度", "Quota left"))
                 .font(.subheadline)
                 .fontWeight(.semibold)
             resetCountdown
@@ -245,9 +245,14 @@ struct ContentView: View {
         }
     }
 
+    /// 状态点取两个窗口中最紧张的那个：只看 5 小时窗口会在周额度见底时仍显示绿色
     private var statusColor: Color {
-        guard let primary = model.rateLimits?.rateLimits.primary else { return .gray }
-        return primary.usedPercent >= 100 ? .red : (primary.usedPercent >= 80 ? .orange : .green)
+        guard let rl = model.rateLimits?.rateLimits else { return .gray }
+        let remaining = [rl.primary, rl.secondary]
+            .compactMap { $0 }
+            .map { 100 - $0.usedPercent }
+        guard let worst = remaining.min() else { return .gray }
+        return quotaColor(worst)
     }
 
     private var statusText: String {
@@ -269,8 +274,10 @@ struct ContentView: View {
     private var usageSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             if let rl = model.rateLimits {
-                windowBar(title: L("5小时用量", "5h usage"), window: rl.rateLimits.primary, color: .orange)
-                windowBar(title: L("1周用量", "1 week"), window: rl.rateLimits.secondary, color: .blue)
+                HStack(alignment: .top, spacing: 12) {
+                    quotaGauge(title: L("5小时", "5h"), window: rl.rateLimits.primary)
+                    quotaGauge(title: L("1周", "1 week"), window: rl.rateLimits.secondary)
+                }
                 HStack {
                     Text(L("计划：", "Plan: ") + (rl.rateLimits.planType ?? "?"))
                     Spacer()
@@ -289,23 +296,45 @@ struct ContentView: View {
         }
     }
 
-    private func windowBar(title: String, window: RateLimitWindow?, color: Color) -> some View {
-        let percent = window?.usedPercent ?? 0
-        return HStack(spacing: 8) {
+    /// 竖向量表，显示**剩余**额度（与 Codex 侧边栏口径一致）：
+    /// 柱子满=额度充足，见底=快用光。
+    private func quotaGauge(title: String, window: RateLimitWindow?) -> some View {
+        let remaining = max(0, min(100, 100 - (window?.usedPercent ?? 0)))
+        let tint = quotaColor(remaining)
+        return VStack(spacing: 5) {
+            Text("\(remaining)%")
+                .font(.system(size: 18, weight: .semibold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(tint)
+            GeometryReader { geo in
+                ZStack(alignment: .bottom) {
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(Color.black.opacity(0.06))
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(LinearGradient(colors: [tint, tint.opacity(0.7)],
+                                             startPoint: .bottom, endPoint: .top))
+                        .frame(height: max(4, geo.size.height * CGFloat(remaining) / 100))
+                }
+            }
+            .frame(height: 92)
             Text(title)
                 .font(.caption)
-                .frame(width: 64, alignment: .leading)
-            ProgressView(value: Double(percent), total: 100)
-                .tint(percent >= 100 ? .red : color)
-            Text("\(percent)%")
-                .font(.caption)
-                .monospacedDigit()
-                .frame(width: 38, alignment: .trailing)
-            Text(resetText(window))
-                .font(.caption)
                 .foregroundStyle(.secondary)
-                .frame(width: 92, alignment: .trailing)
+            Text(resetText(window))
+                .font(.system(size: 10))
+                .monospacedDigit()
+                .foregroundStyle(.tertiary)
         }
+        .frame(maxWidth: .infinity)
+        .help(L("剩余额度 \(remaining)%，\(resetText(window)) 重置",
+                "\(remaining)% left, resets at \(resetText(window))"))
+    }
+
+    /// 剩余额度配色：充足=绿，低于 30%=橙，低于 10%=红
+    private func quotaColor(_ remaining: Int) -> Color {
+        if remaining < 10 { return Color(red: 0.80, green: 0.18, blue: 0.16) }
+        if remaining < 30 { return Color(red: 0.86, green: 0.50, blue: 0.10) }
+        return Color(red: 0.18, green: 0.58, blue: 0.33)
     }
 
     private func resetText(_ window: RateLimitWindow?) -> String {
