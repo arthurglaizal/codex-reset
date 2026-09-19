@@ -80,7 +80,7 @@ struct ContentView: View {
                 analyticsCard
                 Spacer(minLength: 0)
             }
-            .frame(width: 260)
+            .frame(width: 290)
         }
     }
 
@@ -90,30 +90,33 @@ struct ContentView: View {
             Text(L("剩余额度", "Quota left"))
                 .font(.subheadline)
                 .fontWeight(.semibold)
-            resetCountdown
-            Divider()
-                .overlay(Color.black.opacity(0.05))
-            usageSection
+            // 整张卡片每 30 秒重绘，两个柱子下面的倒计时才会走
+            TimelineView(.periodic(from: .now, by: 30)) { _ in
+                VStack(alignment: .leading, spacing: 10) {
+                    resetCountdown
+                    Divider()
+                        .overlay(Color.black.opacity(0.05))
+                    usageSection
+                }
+            }
         }
     }
 
     /// 距离 5 小时窗口重置的大号倒计时。
     /// 用 TimelineView 每 30 秒自刷新，不依赖用量轮询的节奏。
     private var resetCountdown: some View {
-        TimelineView(.periodic(from: .now, by: 30)) { _ in
-            VStack(alignment: .leading, spacing: 0) {
-                Text(model.countdownText() ?? "…")
-                    .font(.system(size: 32, weight: .semibold, design: .rounded))
-                    .monospacedDigit()
-                    .foregroundStyle(highlightOrange)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.6)
-                Text(L("距离 5 小时窗口重置", "until the 5h window resets"))
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
+        VStack(alignment: .leading, spacing: 0) {
+            Text(model.countdownText() ?? "…")
+                .font(.system(size: 32, weight: .semibold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(highlightOrange)
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+            Text(L("距离 5 小时窗口重置", "until the 5h window resets"))
+                .font(.caption2)
+                .foregroundStyle(.secondary)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     /// 用量历史：5 小时窗口时间线
@@ -316,7 +319,7 @@ struct ContentView: View {
                         .frame(height: max(4, geo.size.height * CGFloat(remaining) / 100))
                 }
             }
-            .frame(height: 92)
+            .frame(height: 140)
             Text(title)
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -324,6 +327,10 @@ struct ContentView: View {
                 .font(.system(size: 10))
                 .monospacedDigit()
                 .foregroundStyle(.tertiary)
+            Text(remainingText(window))
+                .font(.system(size: 11, weight: .medium))
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
         .help(L("剩余额度 \(remaining)%，\(resetText(window)) 重置",
@@ -334,7 +341,20 @@ struct ContentView: View {
     private func quotaColor(_ remaining: Int) -> Color {
         if remaining < 10 { return Color(red: 0.80, green: 0.18, blue: 0.16) }
         if remaining < 30 { return Color(red: 0.86, green: 0.50, blue: 0.10) }
-        return Color(red: 0.18, green: 0.58, blue: 0.33)
+        return Color(red: 0.10, green: 0.68, blue: 0.42)
+    }
+
+    /// 距离该窗口重置还有多久；超过一天时带上天数（周窗口用得上）
+    private func remainingText(_ window: RateLimitWindow?) -> String {
+        guard let resetsAt = window?.resetsAt else { return "…" }
+        let remain = Int(Double(resetsAt) - Date().timeIntervalSince1970)
+        guard remain > 0 else { return L("已恢复", "resets now") }
+        let days = remain / 86400
+        let hours = (remain % 86400) / 3600
+        let minutes = (remain % 3600) / 60
+        if days > 0 { return L("\(days)天 \(hours)小时", "\(days)d \(hours)h") }
+        if hours > 0 { return L("\(hours)小时 \(minutes)分", "\(hours)h \(minutes)m") }
+        return L("\(minutes)分钟", "\(minutes)m")
     }
 
     private func resetText(_ window: RateLimitWindow?) -> String {
