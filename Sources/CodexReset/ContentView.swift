@@ -84,13 +84,35 @@ struct ContentView: View {
         }
     }
 
-    /// 用量分析卡片：原顶部的用量条，改为概览右栏的一张卡
+    /// 用量分析卡片：大号倒计时 + 原顶部的用量条
     private var analyticsCard: some View {
         softCard {
             Text(L("用量分析", "Analytics"))
                 .font(.subheadline)
                 .fontWeight(.semibold)
+            resetCountdown
+            Divider()
+                .overlay(Color.black.opacity(0.05))
             usageSection
+        }
+    }
+
+    /// 距离 5 小时窗口重置的大号倒计时。
+    /// 用 TimelineView 每 30 秒自刷新，不依赖用量轮询的节奏。
+    private var resetCountdown: some View {
+        TimelineView(.periodic(from: .now, by: 30)) { _ in
+            VStack(alignment: .leading, spacing: 0) {
+                Text(model.countdownText() ?? "…")
+                    .font(.system(size: 32, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(highlightOrange)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                Text(L("距离 5 小时窗口重置", "until the 5h window resets"))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
