@@ -280,9 +280,13 @@ struct ContentView: View {
     private var pausedSection: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Text(L("暂停的对话（\(model.pausedThreads.count)）", "Paused chats (\(model.pausedThreads.count))"))
+                let stuckCount = model.pausedThreads.filter(\.isStillPaused).count
+                Text(L("暂停的对话（\(stuckCount)/\(model.pausedThreads.count)）",
+                       "Paused chats (\(stuckCount)/\(model.pausedThreads.count))"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .help(L("橙点为确实卡住的对话；灰点的对话在失败之后已被继续过",
+                            "Orange dots are really stuck; grey ones were continued after the failure"))
                 Spacer()
                 if !model.pausedThreads.isEmpty {
                     let pausedIds = Set(model.pausedThreads.map { $0.threadId })
@@ -411,8 +415,20 @@ struct ContentView: View {
             }
         )) {
             HStack(spacing: 6) {
-                Text("–")
-                    .foregroundStyle(.secondary)
+                if showRecovery {
+                    // 橙点=暂停仍是最后一轮（确实卡住）；灰点=之后已被继续过
+                    Circle()
+                        .fill(paused.isStillPaused ? highlightOrange : Color.secondary.opacity(0.3))
+                        .frame(width: 7, height: 7)
+                        .help(paused.isStillPaused
+                              ? L("暂停仍是最后一轮，对话确实卡住",
+                                  "The pause is still the last turn — this chat is really stuck")
+                              : L("失败之后对话已被继续过，无需再次继续",
+                                  "The chat was continued after the failure — no need to resume it"))
+                } else {
+                    Text("–")
+                        .foregroundStyle(.secondary)
+                }
                 Text(paused.title)
                     .font(.subheadline)
                     .lineLimit(1)

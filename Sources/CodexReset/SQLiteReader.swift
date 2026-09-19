@@ -13,6 +13,9 @@ struct PausedThread {
     let recoveryHint: String?
     /// 该失败轮次时间（Unix 秒）
     let failedAt: Int
+    /// 该失败轮次是否仍是对话的最后一轮。
+    /// false 表示失败之后对话已被继续过，不再真正卡住（旧版本会把这类对话误报为暂停）。
+    var isStillPaused: Bool = false
 }
 
 final class SQLiteReader {
@@ -31,7 +34,8 @@ final class SQLiteReader {
         guard let rows = queryRows(
             path: threadHistoryPath,
             sql: """
-            SELECT t.thread_id, t.error_json, t.started_at
+            SELECT t.thread_id, t.error_json, t.started_at,
+                   CASE WHEN t.rollout_ordinal = a.last_ordinal THEN 1 ELSE 0 END AS is_still_paused
             FROM thread_turns t
             JOIN (
                 SELECT thread_id, MAX(turn_id) AS max_turn
@@ -39,6 +43,11 @@ final class SQLiteReader {
                 WHERE status = 'failed' AND error_json LIKE '%usageLimitExceeded%'
                 GROUP BY thread_id
             ) m ON t.thread_id = m.thread_id AND t.turn_id = m.max_turn
+            JOIN (
+                SELECT thread_id, MAX(rollout_ordinal) AS last_ordinal
+                FROM thread_turns
+                GROUP BY thread_id
+            ) a ON a.thread_id = t.thread_id
             ORDER BY t.turn_id DESC
             LIMIT ?
             """,
@@ -50,6 +59,7 @@ final class SQLiteReader {
             let threadId = row[0] as? String ?? ""
             let errorJson = row[1] as? String ?? ""
             let failedAt = row[2] as? Int ?? 0
+            let isStillPaused = (row[3] as? Int ?? 0) == 1
             guard !threadId.isEmpty else { continue }
             // 过滤子代理线程（主对话派生的 subagent，非用户独立对话，无需单独继续）
             if isSubagentThread(threadId: threadId) { continue }
@@ -57,7 +67,8 @@ final class SQLiteReader {
             let cwd = threadCwd(threadId: threadId) ?? ""
             let hint = Self.extractRecoveryHint(from: errorJson)
             result.append(PausedThread(threadId: threadId, title: title, cwd: cwd,
-                                       recoveryHint: hint, failedAt: failedAt))
+                                       recoveryHint: hint, failedAt: failedAt,
+                                       isStillPaused: isStillPaused))
         }
         return result
     }
