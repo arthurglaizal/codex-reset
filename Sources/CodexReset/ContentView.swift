@@ -17,8 +17,8 @@ struct ContentView: View {
     @State private var openSection: OverviewSection? = .paused
     /// 「暂停的对话」列表的搜索词（对话标题 + 项目路径）
     @State private var searchText = ""
-    /// 自定义指令输入区展开状态（默认收起）
-    @State private var commandExpanded = false
+    /// 自定义指令输入区展开状态：默认展开，并记住用户的选择
+    @AppStorage("commandExpanded") private var commandExpanded = true
     /// 当前 Tab：0=概览 1=用量历史 2=日志
     @State private var selectedTab = 0
     /// 是否在概览中显示「全部对话」模块
