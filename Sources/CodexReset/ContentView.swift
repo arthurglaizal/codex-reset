@@ -12,9 +12,9 @@ struct ContentView: View {
     @EnvironmentObject var model: AppModel
     /// 右上角「设置」回调（由 MenuBarController 注入：打开独立设置窗口）
     private let onOpenSettings: (() -> Void)?
-    /// 概览左栏同一时刻只展开一个模块，默认「暂停的对话」
+    /// 概览左栏同一时刻最多展开一个模块，默认「暂停的对话」；nil = 全部收起
     private enum OverviewSection { case paused, continued, all }
-    @State private var openSection: OverviewSection = .paused
+    @State private var openSection: OverviewSection? = .paused
     /// 「暂停的对话」列表的搜索词（对话标题 + 项目路径）
     @State private var searchText = ""
     /// 自定义指令输入区展开状态（默认收起）
@@ -372,10 +372,12 @@ struct ContentView: View {
         }
     }
 
-    /// 手风琴标题行：点击切换到该模块（同一时刻只展开一个）
+    /// 手风琴标题行：点击展开该模块，再次点击收起（同一时刻最多展开一个）
     private func accordionHeader(title: String, section: OverviewSection, isOpen: Bool) -> some View {
         Button {
-            withAnimation(.easeInOut(duration: 0.15)) { openSection = section }
+            withAnimation(.easeInOut(duration: 0.15)) {
+                openSection = isOpen ? nil : section
+            }
         } label: {
             HStack(spacing: 6) {
                 Image(systemName: isOpen ? "chevron.down" : "chevron.right")
@@ -389,6 +391,7 @@ struct ContentView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .help(isOpen ? L("收起", "Collapse") : L("展开", "Expand"))
     }
 
     private var pausedSection: some View {
