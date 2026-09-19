@@ -115,13 +115,6 @@ struct ContentView: View {
             Text(L("距离 5 小时窗口重置", "until the 5h window resets"))
                 .font(.caption2)
                 .foregroundStyle(.secondary)
-            if model.autoMode != .off {
-                Label(L("自动继续在这个时刻触发", "Auto-continue fires at this reset"),
-                      systemImage: "bolt.fill")
-                    .font(.caption2)
-                    .foregroundStyle(highlightOrange)
-                    .padding(.top, 3)
-            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -330,7 +323,7 @@ struct ContentView: View {
         let tint = quotaColor(remaining)
         return VStack(spacing: 5) {
             Text("\(remaining)%")
-                .font(.system(size: primary ? 20 : 15, weight: .semibold, design: .rounded))
+                .font(.system(size: 18, weight: .semibold, design: .rounded))
                 .monospacedDigit()
                 .foregroundStyle(tint)
             GeometryReader { geo in
@@ -343,18 +336,17 @@ struct ContentView: View {
                         .frame(height: max(4, geo.size.height * CGFloat(remaining) / 100))
                 }
             }
-            .frame(height: primary ? 140 : 104)
+            .frame(height: 140)
             HStack(spacing: 3) {
                 if primary {
-                    // 自动继续跟的是这个窗口
+                    // 自动继续跟的是这个窗口，只用图标提示，不改变柱子比例
                     Image(systemName: "bolt.fill")
                         .font(.system(size: 9))
                         .foregroundStyle(highlightOrange)
                 }
                 Text(title)
                     .font(.caption)
-                    .fontWeight(primary ? .semibold : .regular)
-                    .foregroundStyle(primary ? Color.primary : Color.secondary)
+                    .foregroundStyle(.secondary)
             }
             Text(resetText(window))
                 .font(.system(size: 10))
@@ -758,7 +750,8 @@ struct ContentView: View {
             // 总开关 + 作用范围复选框（三种模式互斥，但拆成「开关」与「范围」更易读）
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 10) {
-                    Label(L("用量恢复后自动继续", "Auto-continue after usage resets"),
+                    Label(L("用量恢复后自动继续（5 小时窗口）",
+                            "Auto-continue after usage resets (5h reset)"),
                           systemImage: "bolt.fill")
                         .font(.subheadline)
                         .fontWeight(.semibold)
