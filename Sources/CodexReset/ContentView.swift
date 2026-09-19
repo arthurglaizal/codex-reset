@@ -12,8 +12,9 @@ struct ContentView: View {
     @EnvironmentObject var model: AppModel
     /// 右上角「设置」回调（由 MenuBarController 注入：打开独立设置窗口）
     private let onOpenSettings: (() -> Void)?
-    /// 全部对话模块展开状态（默认收起）
-    @State private var allExpanded = false
+    /// 概览左栏同一时刻只展开一个模块，默认「暂停的对话」
+    private enum OverviewSection { case paused, all }
+    @State private var openSection: OverviewSection = .paused
     /// 自定义指令输入区展开状态（默认收起）
     @State private var commandExpanded = false
     /// 当前 Tab：0=概览 1=用量历史 2=日志
@@ -28,8 +29,6 @@ struct ContentView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             header
-            // 用量摘要固定在顶部，切换 Tab 时仍保留
-            usageSection
             Divider()
             Picker("", selection: $selectedTab) {
                 Text(L("概览", "Overview")).tag(0)
@@ -44,7 +43,7 @@ struct ContentView: View {
             footer
         }
         .padding(14)
-        .frame(width: 600, height: 760, alignment: .top)
+        .frame(width: 760, height: 800, alignment: .top)
         // 浅色主题：全不透明浅色背景
         .background(Color(red: 0.95, green: 0.945, blue: 0.93))
         .preferredColorScheme(.light)
@@ -60,17 +59,34 @@ struct ContentView: View {
         }
     }
 
-    /// 概览：暂停对话 + 全部对话（可隐藏）+ 自动继续模块（沉底）
+    /// 概览：左栏手风琴（暂停/全部对话），右栏自动继续 + 用量分析
     private var overviewTab: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            pausedSection
-            Divider()
-            if showAllThreads {
-                allSection
+        HStack(alignment: .top, spacing: 14) {
+            VStack(alignment: .leading, spacing: 10) {
+                pausedSection
+                if showAllThreads {
+                    Divider()
+                    allSection
+                }
             }
-            // 自动继续卡片始终置底
-            Spacer(minLength: 8)
-            controlsSection
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+
+            VStack(alignment: .leading, spacing: 12) {
+                controlsSection
+                analyticsCard
+                Spacer(minLength: 0)
+            }
+            .frame(width: 260)
+        }
+    }
+
+    /// 用量分析卡片：原顶部的用量条，改为概览右栏的一张卡
+    private var analyticsCard: some View {
+        softCard {
+            Text(L("用量分析", "Analytics"))
+                .font(.subheadline)
+                .fontWeight(.semibold)
+            usageSection
         }
     }
 
@@ -343,79 +359,84 @@ struct ContentView: View {
         threads.filter(\.isStillPaused) + threads.filter { !$0.isStillPaused }
     }
 
-    private var pausedSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(L("暂停的对话（\(model.pausedThreads.count)）",
-                   "Paused chats (\(model.pausedThreads.count))"))
-                .font(.system(size: 15, weight: .semibold))
-            pausedLegend
-            if model.pausedThreads.isEmpty {
-                Text(L("未找到因用量暂停的对话", "No usage-paused chats found"))
-                    .font(.caption)
+    /// 手风琴标题行：点击切换到该模块（同一时刻只展开一个）
+    private func accordionHeader(title: String, section: OverviewSection, isOpen: Bool) -> some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.15)) { openSection = section }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: isOpen ? "chevron.down" : "chevron.right")
+                    .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(.secondary)
-            } else {
-                // 列头
-                HStack(spacing: 6) {
-                    Text(L("项目", "Project"))
-                        .frame(width: 88, alignment: .leading)
-                    Text(L("对话", "Chat"))
-                    Spacer()
-                    Text(L("状态", "Status"))
-                        .frame(width: 74, alignment: .trailing)
-                }
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
-                .padding(.horizontal, 18)
+                Text(title)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(isOpen ? Color.primary : Color.secondary)
+                Spacer()
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
 
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 6) {
-                        ForEach(Array(groupByProject(model.pausedThreads).enumerated()), id: \.offset) { _, group in
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(group.name)
-                                    .font(.caption)
-                                    .fontWeight(.semibold)
-                                    .foregroundStyle(.secondary)
-                                // 确实卡住的排在项目内的前面
-                                ForEach(stuckFirst(group.threads), id: \.threadId) { paused in
-                                    threadRow(paused, showRecovery: true)
+    private var pausedSection: some View {
+        let isOpen = openSection == .paused
+        return VStack(alignment: .leading, spacing: 8) {
+            accordionHeader(title: L("暂停的对话（\(model.pausedThreads.count)）",
+                                     "Paused chats (\(model.pausedThreads.count))"),
+                            section: .paused, isOpen: isOpen)
+            if isOpen {
+                pausedLegend
+                if model.pausedThreads.isEmpty {
+                    Text(L("未找到因用量暂停的对话", "No usage-paused chats found"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    // 列头
+                    HStack(spacing: 6) {
+                        Text(L("项目", "Project"))
+                            .frame(width: 88, alignment: .leading)
+                        Text(L("对话", "Chat"))
+                        Spacer()
+                        Text(L("状态", "Status"))
+                            .frame(width: 92, alignment: .trailing)
+                    }
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                    .padding(.horizontal, 18)
+
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 6) {
+                            ForEach(Array(groupByProject(model.pausedThreads).enumerated()), id: \.offset) { _, group in
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(group.name)
+                                        .font(.caption)
+                                        .fontWeight(.semibold)
+                                        .foregroundStyle(.secondary)
+                                    // 确实卡住的排在项目内的前面
+                                    ForEach(stuckFirst(group.threads), id: \.threadId) { paused in
+                                        threadRow(paused, showRecovery: true)
+                                    }
                                 }
                             }
                         }
                     }
+                    .frame(maxHeight: .infinity)
                 }
-                .frame(maxHeight: 160)
             }
         }
+        .frame(maxHeight: isOpen ? .infinity : nil, alignment: .top)
     }
 
     // MARK: - 全部对话（默认收起，可勾选任意对话参与自动继续）
 
     private var allSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        let isOpen = openSection == .all
+        return VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 6) {
-                // 标题行：点击折叠/展开
-                Button {
-                    withAnimation(.easeInOut(duration: 0.15)) { allExpanded.toggle() }
-                } label: {
-                    HStack(spacing: 5) {
-                        Image(systemName: allExpanded ? "chevron.down" : "chevron.right")
-                            .font(.system(size: 9, weight: .semibold))
-                            .foregroundStyle(.secondary)
-                        Text(L("全部对话（\(model.allThreads.count)）", "All chats (\(model.allThreads.count))"))
-                            .font(.caption)
-                            .fontWeight(.semibold)
-                            .foregroundStyle(.secondary)
-                    }
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .help(allExpanded
-                      ? L("收起", "Collapse")
-                      : L("展开全部对话", "Expand all chats"))
-
-                Spacer()
-
-                if allExpanded, !model.allThreads.isEmpty {
+                accordionHeader(title: L("全部对话（\(model.allThreads.count)）",
+                                         "All chats (\(model.allThreads.count))"),
+                                section: .all, isOpen: isOpen)
+                if isOpen, !model.allThreads.isEmpty {
                     let allIds = Set(model.allThreads.map { $0.threadId })
                     Button(allIds.isSubset(of: model.selectedThreadIds)
                            ? L("取消全选", "Clear all")
@@ -430,7 +451,7 @@ struct ContentView: View {
                 }
             }
 
-            if allExpanded {
+            if isOpen {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 6) {
                         ForEach(Array(groupByProject(model.allThreads).enumerated()), id: \.offset) { _, group in
@@ -446,9 +467,10 @@ struct ContentView: View {
                         }
                     }
                 }
-                .frame(maxHeight: 200)
+                .frame(maxHeight: .infinity)
             }
         }
+        .frame(maxHeight: isOpen ? .infinity : nil, alignment: .top)
     }
 
     private func threadRow(_ paused: PausedThread, showRecovery: Bool) -> some View {
