@@ -832,10 +832,10 @@ struct ContentView: View {
 
             // 总开关 + 作用范围复选框（三种模式互斥，但拆成「开关」与「范围」更易读）
             VStack(alignment: .leading, spacing: 8) {
-                HStack(alignment: .top, spacing: 10) {
+                HStack(alignment: .center, spacing: 10) {
                     // Label tronque le texte dans un HStack contraint : on le compose a la main
                     Image(systemName: "bolt.fill")
-                        .font(.subheadline)
+                        .font(.system(size: 19))
                     Text(L("用量恢复后自动继续（5 小时窗口）",
                            "Auto-continue after usage resets (5h reset)"))
                         .font(.subheadline)
