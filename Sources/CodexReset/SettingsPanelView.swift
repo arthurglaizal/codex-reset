@@ -57,6 +57,28 @@ struct SettingsPanelView: View {
             Divider()
                 .overlay(theme.hairline)
 
+            // 外观
+            HStack(spacing: 10) {
+                Text(L("外观", "Appearance"))
+                    .font(.subheadline)
+                Spacer()
+                Picker("", selection: $appearanceRaw) {
+                    Label(L("浅色", "Light"), systemImage: "sun.max.fill")
+                        .tag(AppearanceSetting.light.rawValue)
+                    Label(L("深色", "Dark"), systemImage: "moon.fill")
+                        .tag(AppearanceSetting.dark.rawValue)
+                }
+                .pickerStyle(.segmented)
+                .labelStyle(.titleAndIcon)
+                .labelsHidden()
+                .frame(width: 205)
+            }
+            .help(L("面板配色为固定的两套，不跟随系统",
+                    "The panel ships two fixed palettes and does not follow the system"))
+
+            Divider()
+                .overlay(theme.hairline)
+
             // 语言
             HStack(spacing: 10) {
                 Text(L("语言", "Language"))

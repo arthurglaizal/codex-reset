@@ -37,7 +37,6 @@ final class MenuBarController: NSObject {
         popover = NSPopover()
         popover.contentSize = NSSize(width: 900, height: 840)
         popover.behavior = .transient
-        popover.appearance = NSAppearance(named: AppearanceSetting.current == .dark ? .darkAqua : .aqua)
         popover.contentViewController = hosting
 
         // 数据变化时刷新标题
@@ -48,11 +47,25 @@ final class MenuBarController: NSObject {
             }
             .store(in: &cancellables)
 
+        // 外观在设置窗口里改，标题栏和弹窗的 chrome 要跟着换
+        NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)
+            .sink { [weak self] _ in
+                Task { @MainActor in self?.applyAppearance() }
+            }
+            .store(in: &cancellables)
+
         // 每秒刷新倒计时
         titleTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.updateTitle() }
         }
         updateTitle()
+    }
+
+    /// 把当前外观设置应用到弹窗与设置窗口的 chrome
+    private func applyAppearance() {
+        let appearance = NSAppearance(named: AppearanceSetting.current == .dark ? .darkAqua : .aqua)
+        popover?.appearance = appearance
+        settingsWindow?.appearance = appearance
     }
 
     private func updateTitle() {
@@ -173,8 +186,7 @@ final class MenuBarController: NSObject {
             settingsWindow = win
         }
         guard let win = settingsWindow else { return }
-        // 标题栏跟随面板的外观设置，否则深浅不一致
-        win.appearance = NSAppearance(named: AppearanceSetting.current == .dark ? .darkAqua : .aqua)
+        applyAppearance()
         if !win.isVisible {
             // 首次打开放到主屏中央
             if let screen = NSScreen.main {
@@ -190,8 +202,7 @@ final class MenuBarController: NSObject {
     }
 
     @objc private func togglePopover() {
-        // 设置可能在上次打开后改过
-        popover.appearance = NSAppearance(named: AppearanceSetting.current == .dark ? .darkAqua : .aqua)
+        applyAppearance()
         guard let button = statusItem.button else { return }
         if popover.isShown {
             popover.performClose(nil)

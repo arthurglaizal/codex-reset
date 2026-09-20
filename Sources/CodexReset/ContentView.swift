@@ -290,14 +290,6 @@ struct ContentView: View {
             .pickerStyle(.segmented)
             .frame(width: 330)
 
-            Picker("", selection: $appearanceRaw) {
-                Image(systemName: "moon.fill").tag(AppearanceSetting.dark.rawValue)
-                Image(systemName: "sun.max.fill").tag(AppearanceSetting.light.rawValue)
-            }
-            .pickerStyle(.segmented)
-            .frame(width: 76)
-            .help(L("切换深色 / 浅色外观", "Switch between dark and light appearance"))
-
             Spacer()
                 .frame(width: 4)
             // 右上角：设置（打开独立设置窗口）
