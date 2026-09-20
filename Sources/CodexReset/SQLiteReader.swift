@@ -14,7 +14,7 @@ struct PausedThread {
     /// 该失败轮次时间（Unix 秒）
     let failedAt: Int
     /// 该失败轮次是否仍是对话的最后一轮。
-    /// false 表示失败之后对话已被继续过，不再真正卡住（旧版本会把这类对话误报为暂停）。
+    /// false 表示失败之后对话已被继续过，不再处于暂停（旧版本会把这类对话误报为暂停）。
     var isStillPaused: Bool = false
     /// 该对话最后一条用户消息的开头，用作副标题（标题常被自动「继续」覆盖，看不出在做什么）
     var lastUserMessage: String? = nil

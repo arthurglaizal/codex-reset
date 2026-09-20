@@ -29,7 +29,7 @@ final class AppModel: ObservableObject {
         case off
         /// 用量恢复后只继续勾选的对话
         case selected
-        /// 用量恢复后继续所有确实卡住的对话，无需勾选
+        /// 用量恢复后继续所有仍处于暂停的对话，无需勾选
         case all
     }
     @Published var autoMode: AutoMode {
@@ -411,7 +411,7 @@ final class AppModel: ObservableObject {
         let targets = continueTargets()
         guard !targets.isEmpty else {
             if autoMode == .all {
-                appendLog("没有卡住的对话，跳过自动继续", "No stuck chats; skipping auto-continue")
+                appendLog("没有暂停中的对话，跳过自动继续", "No paused chats; skipping auto-continue")
             } else {
                 appendLog("没有勾选的对话，跳过自动继续", "No chats selected; skipping auto-continue")
             }

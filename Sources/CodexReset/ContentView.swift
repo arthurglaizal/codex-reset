@@ -6,8 +6,8 @@ private let highlightOrange = Color(red: 0.72, green: 0.33, blue: 0.10)
 private let gaugeBarHeight: CGFloat = 128
 /// 柱子上方（标题 + 百分比）占用的高度
 private let gaugeHeaderHeight: CGFloat = 47
-/// 暂停仍是最后一轮（确实卡住）
-private let stuckSymbol = "pause.circle.fill"
+/// 暂停仍是最后一轮，对话仍处于暂停
+private let pausedSymbol = "pause.circle.fill"
 /// 失败之后对话已被继续过
 private let resumedSymbol = "checkmark.circle"
 
@@ -447,8 +447,8 @@ struct ContentView: View {
         return order
     }
 
-    /// 确实卡住的对话（列表只展示这些）
-    private var stuckThreads: [PausedThread] {
+    /// 仍处于暂停的对话（列表只展示这些）
+    private var pausedThreads: [PausedThread] {
         model.pausedThreads.filter(\.isStillPaused)
     }
 
@@ -467,7 +467,7 @@ struct ContentView: View {
         }
     }
 
-    /// 搜索框：取代原先的状态图例（列表已只剩卡住的对话，图例无意义）
+    /// 搜索框：取代原先的状态图例（列表已只剩暂停中的对话，图例无意义）
     private var searchField: some View {
         HStack(spacing: 6) {
             Image(systemName: "magnifyingglass")
@@ -503,7 +503,7 @@ struct ContentView: View {
     /// 「全选」主复选框：空 / 半选 / 全选，与下方每行的复选框同列
     @ViewBuilder
     private var selectAllCheckbox: some View {
-        let ids = Set(stuckThreads.map { $0.threadId })
+        let ids = Set(pausedThreads.map { $0.threadId })
         if !ids.isEmpty, model.autoMode != .all {
             let selected = ids.intersection(model.selectedThreadIds)
             let isAll = selected.count == ids.count
@@ -522,9 +522,9 @@ struct ContentView: View {
             .buttonStyle(.plain)
             .help(isAll
                   ? L("取消全选", "Clear selection")
-                  : L("全选卡住的对话（\(selected.count)/\(ids.count) 已选）",
-                      "Select all stuck chats (\(selected.count)/\(ids.count) selected)"))
-            .accessibilityLabel(L("全选卡住的对话", "Select all stuck chats"))
+                  : L("全选暂停的对话（\(selected.count)/\(ids.count) 已选）",
+                      "Select all paused chats (\(selected.count)/\(ids.count) selected)"))
+            .accessibilityLabel(L("全选暂停的对话", "Select all paused chats"))
         }
     }
 
@@ -554,17 +554,17 @@ struct ContentView: View {
 
     private var pausedSection: some View {
         let isOpen = openSection == .paused
-        let threads = matchingSearch(stuckThreads)
+        let threads = matchingSearch(pausedThreads)
         return VStack(alignment: .leading, spacing: 8) {
-            accordionHeader(title: L("暂停的对话（\(stuckThreads.count)）",
-                                     "Paused chats (\(stuckThreads.count))"),
+            accordionHeader(title: L("暂停的对话（\(pausedThreads.count)）",
+                                     "Paused chats (\(pausedThreads.count))"),
                             section: .paused, isOpen: isOpen)
             if isOpen {
                 HStack(spacing: 8) {
                     selectAllCheckbox
                     searchField
                 }
-                if stuckThreads.isEmpty {
+                if pausedThreads.isEmpty {
                     Text(L("未找到因用量暂停的对话", "No usage-paused chats found"))
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -714,11 +714,11 @@ struct ContentView: View {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 if showRecovery {
                     let label = paused.isStillPaused
-                        ? L("暂停仍是最后一轮，对话确实卡住",
-                            "The pause is the last message, so this chat is really stuck")
+                        ? L("暂停仍是最后一轮，对话仍处于暂停",
+                            "The pause is the last message, so this chat is still paused")
                         : L("失败之后对话已被继续过，无需再次继续",
                             "The chat was continued after the pause, so it needs nothing")
-                    Image(systemName: paused.isStillPaused ? stuckSymbol : resumedSymbol)
+                    Image(systemName: paused.isStillPaused ? pausedSymbol : resumedSymbol)
                         .font(.system(size: 13))
                         .foregroundStyle(paused.isStillPaused ? highlightOrange : Color.secondary)
                         .help(label)
@@ -794,7 +794,7 @@ struct ContentView: View {
         )
     }
 
-    /// 作用范围：勾上=全部卡住的对话，不勾=只继续已勾选的
+    /// 作用范围：勾上=全部暂停的对话，不勾=只继续已勾选的
     private var autoScopeBinding: Binding<Bool> {
         Binding(
             get: { autoScopeAll },
@@ -817,8 +817,8 @@ struct ContentView: View {
             return L("用量窗口重置后，自动把指令发送到已勾选的对话",
                      "When the usage window resets, the command is sent to the chats you ticked.")
         case .all:
-            return L("用量窗口重置后，自动继续所有卡住的对话，无需勾选",
-                     "When the usage window resets, every stuck chat is continued. No ticking needed.")
+            return L("用量窗口重置后，自动继续所有暂停的对话，无需勾选",
+                     "When the usage window resets, every paused chat is continued. No ticking needed.")
         }
     }
 
@@ -847,8 +847,8 @@ struct ContentView: View {
                         .toggleStyle(.switch)
                 }
                 Toggle(isOn: autoScopeBinding) {
-                    Text(L("包含全部卡住的对话，无需勾选",
-                           "Every stuck chat, no ticking needed"))
+                    Text(L("包含全部暂停的对话，无需勾选",
+                           "Every paused chat, no ticking needed"))
                         .font(.caption)
                 }
                 .toggleStyle(.checkbox)
