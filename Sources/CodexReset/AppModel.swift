@@ -197,8 +197,14 @@ final class AppModel: ObservableObject {
             let v = enabled ? "true" : "false"
             appendLog("已写入 [features] remote_control = \(v)，请重启 Codex 桌面 app 后生效",
                       "Wrote [features] remote_control = \(v); restart the Codex desktop app to take effect")
-            notify(title: enabled ? "已启用 remote_control" : "已关闭 remote_control",
-                   body: enabled ? "请重启 Codex 桌面 app，之后即可通过官方协议自动继续对话" : "已关闭，之后使用 app-server + GUI 兜底通道")
+            notify(title: enabled
+                          ? L("已启用 remote_control", "remote_control enabled")
+                          : L("已关闭 remote_control", "remote_control disabled"),
+                   body: enabled
+                         ? L("请重启 Codex 桌面 app，之后即可通过官方协议自动继续对话",
+                             "Restart the Codex desktop app to continue chats over the official protocol.")
+                         : L("已关闭，之后使用 app-server + GUI 兜底通道",
+                             "Disabled. The app-server and GUI fallback channels will be used instead."))
         } else {
             appendLog("写入 config.toml 失败", "Failed to write config.toml")
         }
@@ -264,7 +270,9 @@ final class AppModel: ObservableObject {
     private func notifyRestartCodex() {
         appendLog("remote_control 已启用但未生效：请重启 Codex 桌面 app，之后自动继续将走官方协议（无需辅助功能权限）",
                   "remote_control is enabled but not active yet: restart the Codex desktop app so auto-continue uses the official protocol (no accessibility permission needed)")
-        notify(title: "请重启 Codex 桌面 app", body: "remote_control 已开启，重启后本 App 会自动切换到官方协议通道继续对话")
+        notify(title: L("请重启 Codex 桌面 app", "Restart the Codex desktop app"),
+               body: L("remote_control 已开启，重启后本 App 会自动切换到官方协议通道继续对话",
+                       "remote_control is on. After a restart, CodexReset switches to the official protocol channel."))
     }
 
     /// 检测到 remote_control socket 出现时，自动从独立实例切换到桌面 app-server
@@ -388,7 +396,8 @@ final class AppModel: ObservableObject {
 
         if recovered {
             appendLog("检测到用量恢复！usedPercent=\(primary?.usedPercent ?? -1)%", "Usage recovered! usedPercent=\(primary?.usedPercent ?? -1)%")
-            notify(title: "Codex 用量已恢复", body: "正在自动继续上次暂停的对话…")
+            notify(title: L("Codex 用量已恢复", "Codex usage recovered"),
+                   body: L("正在自动继续上次暂停的对话…", "Continuing the paused chats…"))
             Task { await autoContinueIfNeeded() }
         }
         wasLimited = isLimited
@@ -437,11 +446,14 @@ final class AppModel: ObservableObject {
         )
         isWorking = false
         if ok {
-            notify(title: "Codex 已继续", body: "已对「\(paused.title)」发送「\(continueCommand)」")
+            notify(title: L("Codex 已继续", "Codex continued"),
+                   body: L("已对「\(paused.title)」发送「\(continueCommand)」",
+                           "Sent \"\(continueCommand)\" to \"\(paused.title)\""))
         } else {
             // 手动/自动失败都要明确反馈（辅助功能引导走 engine.onNeedAccessibility 通知，不自动弹系统设置）
             let reason = engine.lastFailureReason ?? "未知原因"
-            notify(title: "继续失败", body: "「\(paused.title)」\n\(reason)")
+            notify(title: L("继续失败", "Could not continue"),
+                   body: "\(paused.title)\n\(reason)")
         }
     }
 
@@ -474,7 +486,9 @@ final class AppModel: ObservableObject {
         accessibilityAuthorized = AppleScriptAutomation.hasAccessibilityPermission()
         let note = NSUserNotification()
         note.title = "CodexReset"
-        note.informativeText = "辅助功能未授权，无法在 Codex 中输入「继续」。请点面板「授权辅助功能」勾选本 App（若勾选过仍提示，请重新勾选一次）。"
+        note.informativeText = L(
+            "辅助功能未授权，无法在 Codex 中输入「继续」。请点面板「授权辅助功能」勾选本 App（若勾选过仍提示，请重新勾选一次）。",
+            "Accessibility is not granted, so the command cannot be typed into Codex. Use \"Grant\" in the panel and tick CodexReset (tick it again if it is already ticked).")
         NSUserNotificationCenter.default.deliver(note)
     }
 
