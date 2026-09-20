@@ -542,7 +542,7 @@ struct ContentView: View {
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(.secondary)
                 Text(title)
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(isOpen ? Color.primary : Color.secondary)
                 Spacer()
             }
@@ -627,7 +627,7 @@ struct ContentView: View {
                 ForEach(Array(groupByProject(threads).enumerated()), id: \.offset) { _, group in
                     VStack(alignment: .leading, spacing: 5) {
                         Text(group.name)
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(.system(size: 11, weight: .semibold))
                             .foregroundStyle(.secondary)
                         ForEach(group.threads, id: \.threadId) { thread in
                             threadRow(thread, showRecovery: showRecovery)
@@ -701,7 +701,7 @@ struct ContentView: View {
             }
             threadRowLabel(paused, showRecovery: showRecovery)
         }
-        .padding(.vertical, 5)
+        .padding(.vertical, 4)
         .padding(.horizontal, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
@@ -722,52 +722,56 @@ struct ContentView: View {
     }
 
     private func threadRowLabel(_ paused: PausedThread, showRecovery: Bool) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
-                if showRecovery {
-                    let label = paused.isStillPaused
-                        ? L("暂停仍是最后一轮，对话仍处于暂停",
-                            "The pause is the last message, so this chat is still paused")
-                        : L("失败之后对话已被继续过，无需再次继续",
-                            "The chat was continued after the pause, so it needs nothing")
-                    Image(systemName: paused.isStillPaused ? pausedSymbol : resumedSymbol)
-                        .font(.system(size: 13))
-                        .foregroundStyle(paused.isStillPaused ? highlightOrange : Color.secondary)
-                        .help(label)
-                        .accessibilityLabel(label)
-                }
-                Text(paused.title)
-                    .font(.system(size: 14, weight: .medium))
-                    .lineLimit(1)
-                Spacer(minLength: 6)
-                if showRecovery {
-                    if paused.isStillPaused, let hint = paused.recoveryHint {
-                        Text(cleanHint(hint))
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(highlightOrange)
-                    } else if !paused.isStillPaused {
-                        Text(L("已继续", "Resumed"))
-                            .font(.system(size: 12))
-                            .foregroundStyle(.secondary)
-                    }
-                }
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            if showRecovery {
+                let label = paused.isStillPaused
+                    ? L("暂停仍是最后一轮，对话仍处于暂停",
+                        "The pause is the last message, so this chat is still paused")
+                    : L("失败之后对话已被继续过，无需再次继续",
+                        "The chat was continued after the pause, so it needs nothing")
+                Image(systemName: paused.isStillPaused ? pausedSymbol : resumedSymbol)
+                    .font(.system(size: 11))
+                    .foregroundStyle(paused.isStillPaused ? highlightOrange : Color.secondary)
+                    .help(label)
+                    .accessibilityLabel(label)
             }
-            // 副标题只在和标题不同时才有信息量
-            if let preview = paused.lastUserMessage, !isRedundant(preview, with: paused.title) {
-                Text(preview)
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
+            Text(paused.title)
+                .font(.system(size: 13, weight: .medium))
+                .lineLimit(1)
+            Spacer(minLength: 6)
+            turnCountTag(paused.turnCount)
+            if showRecovery {
+                if paused.isStillPaused, let hint = paused.recoveryHint {
+                    Text(cleanHint(hint))
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(highlightOrange)
+                } else if !paused.isStillPaused {
+                    Text(L("已继续", "Resumed"))
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    /// 副标题是否只是标题的重复
-    private func isRedundant(_ preview: String, with title: String) -> Bool {
-        let head = String(title.prefix(24))
-        return preview.isEmpty || preview.hasPrefix(head)
+    /// 轮次计数：气泡图标 + 数字，用来区分「聊了很久」和「刚起头就停了」
+    @ViewBuilder
+    private func turnCountTag(_ count: Int) -> some View {
+        if count > 0 {
+            HStack(spacing: 3) {
+                Image(systemName: "bubble.left.and.bubble.right")
+                    .font(.system(size: 9))
+                Text("\(count)")
+                    .font(.system(size: 10, weight: .medium))
+                    .monospacedDigit()
+            }
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 5)
+            .padding(.vertical, 2)
+            .background(Capsule().fill(Color.black.opacity(0.05)))
+            .help(L("该对话共 \(count) 轮", "\(count) turns in this chat"))
+        }
     }
 
     /// 去掉恢复提示末尾的句点，如 "7:27 PM." -> "7:27 PM"

@@ -16,8 +16,8 @@ struct PausedThread {
     /// 该失败轮次是否仍是对话的最后一轮。
     /// false 表示失败之后对话已被继续过，不再处于暂停（旧版本会把这类对话误报为暂停）。
     var isStillPaused: Bool = false
-    /// 该对话最后一条用户消息的开头，用作副标题（标题常被自动「继续」覆盖，看不出在做什么）
-    var lastUserMessage: String? = nil
+    /// 该对话一共进行了多少轮（用户提问 + 回答算一轮）
+    var turnCount: Int = 0
 }
 
 final class SQLiteReader {
@@ -56,7 +56,8 @@ final class SQLiteReader {
             args: [limit]
         ) else { return [] }
 
-        let bounds = userMessageBounds()
+        let firsts = firstUserMessages()
+        let turns = turnCounts()
         var result: [PausedThread] = []
         for row in rows {
             let threadId = row[0] as? String ?? ""
@@ -66,14 +67,14 @@ final class SQLiteReader {
             guard !threadId.isEmpty else { continue }
             // 过滤子代理线程（主对话派生的 subagent，非用户独立对话，无需单独继续）
             if isSubagentThread(threadId: threadId) { continue }
-            let entry = bounds[threadId]
-            let title = displayTitle(stateTitle: threadTitle(threadId: threadId), messages: entry)
+            let title = displayTitle(stateTitle: threadTitle(threadId: threadId),
+                                     firstMessage: firsts[threadId])
             let cwd = threadCwd(threadId: threadId) ?? ""
             let hint = Self.extractRecoveryHint(from: errorJson)
             result.append(PausedThread(threadId: threadId, title: title, cwd: cwd,
                                        recoveryHint: hint, failedAt: failedAt,
                                        isStillPaused: isStillPaused,
-                                       lastUserMessage: entry?.last))
+                                       turnCount: turns[threadId] ?? 0))
         }
         return result
     }
@@ -88,7 +89,8 @@ final class SQLiteReader {
             LIMIT ?
         """, args: [limit]) else { return [] }
 
-        let bounds = userMessageBounds()
+        let firsts = firstUserMessages()
+        let turns = turnCounts()
         var result: [PausedThread] = []
         for row in rows {
             let threadId = row[0] as? String ?? ""
@@ -96,51 +98,54 @@ final class SQLiteReader {
             let cwd = row[2] as? String ?? ""
             let updatedAt = row[3] as? Int ?? 0
             guard !threadId.isEmpty else { continue }
-            let entry = bounds[threadId]
-            let title = displayTitle(stateTitle: rawTitle, messages: entry)
+            let title = displayTitle(stateTitle: rawTitle, firstMessage: firsts[threadId])
             result.append(PausedThread(threadId: threadId, title: title, cwd: cwd,
                                        recoveryHint: nil, failedAt: updatedAt,
                                        isStillPaused: false,
-                                       lastUserMessage: entry?.last))
+                                       turnCount: turns[threadId] ?? 0))
         }
         return result
     }
 
-    /// 每个线程的首条 / 末条 userMessage，一次查询取全部（逐条查会打开上百次库）。
-    func userMessageBounds() -> [String: (first: String?, last: String?)] {
+    /// 每个线程的首条 userMessage，仅在 state 里没有可用标题时兜底。
+    func firstUserMessages() -> [String: String] {
         guard let rows = queryRows(path: threadHistoryPath, sql: """
-            SELECT i.thread_id, i.item_json,
-                   CASE WHEN i.rollout_ordinal = m.first_ord THEN 1 ELSE 0 END AS is_first
+            SELECT i.thread_id, i.item_json
             FROM thread_items i
             JOIN (
-                SELECT thread_id,
-                       MIN(rollout_ordinal) AS first_ord,
-                       MAX(rollout_ordinal) AS last_ord
+                SELECT thread_id, MIN(rollout_ordinal) AS first_ord
                 FROM thread_items
                 WHERE item_type = 'userMessage'
                 GROUP BY thread_id
-            ) m ON m.thread_id = i.thread_id
-             AND i.rollout_ordinal IN (m.first_ord, m.last_ord)
+            ) m ON m.thread_id = i.thread_id AND i.rollout_ordinal = m.first_ord
             WHERE i.item_type = 'userMessage'
         """) else { return [:] }
 
-        var result: [String: (first: String?, last: String?)] = [:]
+        var result: [String: String] = [:]
         for row in rows {
             guard let threadId = row[0] as? String, !threadId.isEmpty,
-                  let json = row[1] as? String else { continue }
-            let text = Self.extractText(fromItemJSON: json)
-            var entry = result[threadId] ?? (first: nil, last: nil)
-            if (row[2] as? Int ?? 0) == 1 {
-                entry.first = text
-            } else {
-                entry.last = text
-            }
-            result[threadId] = entry
+                  let json = row[1] as? String,
+                  let text = Self.extractText(fromItemJSON: json) else { continue }
+            result[threadId] = text
         }
         return result
     }
 
-    /// 从 thread_items.item_json 里取出用户消息正文，只保留前 500 字
+    /// 每个线程的轮次数，一次查询取全部
+    func turnCounts() -> [String: Int] {
+        guard let rows = queryRows(path: threadHistoryPath, sql: """
+            SELECT thread_id, COUNT(*) FROM thread_turns GROUP BY thread_id
+        """) else { return [:] }
+
+        var result: [String: Int] = [:]
+        for row in rows {
+            guard let threadId = row[0] as? String, !threadId.isEmpty else { continue }
+            result[threadId] = row[1] as? Int ?? 0
+        }
+        return result
+    }
+
+    /// 从 thread_items.item_json 里取出用户消息正文，只保留前 120 字（够当标题）
     static func extractText(fromItemJSON json: String) -> String? {
         guard let data = json.data(using: .utf8),
               let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -150,7 +155,7 @@ final class SQLiteReader {
     }
 
     /// Codex 会在用户消息前拼接上下文块（`# Files mentioned by the user:` + `## 文件: 路径`）。
-    /// 直接展示这段的话每条都长得一样，所以跳到真正的正文。
+    /// 直接拿这段当标题的话每条都长得一样，所以跳到真正的正文。
     static func meaningfulText(_ raw: String) -> String? {
         let lines = raw.components(separatedBy: "\n")
         var index = 0
@@ -164,18 +169,17 @@ final class SQLiteReader {
         }
         let body = lines[index...]
             .joined(separator: " ")
-            .replacingOccurrences(of: "\n", with: " ")
             .trimmingCharacters(in: .whitespacesAndNewlines)
-        if !body.isEmpty { return String(body.prefix(500)) }
+        if !body.isEmpty { return String(body.prefix(120)) }
         if attachments > 0 {
             return L("附带 \(attachments) 个文件", "\(attachments) file(s) attached")
         }
         let fallback = raw.replacingOccurrences(of: "\n", with: " ")
             .trimmingCharacters(in: .whitespacesAndNewlines)
-        return fallback.isEmpty ? nil : String(fallback.prefix(500))
+        return fallback.isEmpty ? nil : String(fallback.prefix(120))
     }
 
-    /// 判断是否为子代理线程    /// 判断是否为子代理线程（state 库 source 以 {"subagent" 开头）
+    /// 判断是否为子代理线程    /// 判断是否为子代理线程    /// 判断是否为子代理线程（state 库 source 以 {"subagent" 开头）
     private func isSubagentThread(threadId: String) -> Bool {
         guard let source = threadSource(threadId: threadId) else { return false }
         return source.trimmingCharacters(in: .whitespaces).hasPrefix(#"{"subagent""#)
@@ -187,28 +191,11 @@ final class SQLiteReader {
                  args: [threadId])?[0] as? String
     }
 
-    /// 显示用标题。
-    /// Codex 会把对话标题同步成最新一条用户消息，所以 state 里的标题常常就是副标题那句话。
-    /// 遇到这种情况回退到首条消息（最初的任务），标题和副标题才各说各的。
-    private func displayTitle(stateTitle: String?,
-                              messages: (first: String?, last: String?)?) -> String {
-        let fallback = messages?.first ?? messages?.last
-        guard let stateTitle, stateTitle.count >= 3 else {
-            return trimTitle(fallback) ?? L("未命名对话", "Untitled chat")
-        }
-        // 标题只是末条消息的开头 → 换成首条消息
-        if let last = messages?.last, last.hasPrefix(String(stateTitle.prefix(24))) {
-            if let first = messages?.first, !first.hasPrefix(String(stateTitle.prefix(24))) {
-                return trimTitle(first) ?? stateTitle
-            }
-        }
-        return stateTitle
-    }
-
-    /// 消息正文当标题时截断到一行长度
-    private func trimTitle(_ text: String?) -> String? {
-        guard let text, !text.isEmpty else { return nil }
-        return String(text.prefix(60))
+    /// 显示用标题：优先 state 里的标题，太短或缺失时用首条消息兜底
+    private func displayTitle(stateTitle: String?, firstMessage: String?) -> String {
+        if let stateTitle, stateTitle.count >= 3 { return stateTitle }
+        if let firstMessage, !firstMessage.isEmpty { return String(firstMessage.prefix(60)) }
+        return L("未命名对话", "Untitled chat")
     }
 
     private func threadTitle(threadId: String) -> String? {
