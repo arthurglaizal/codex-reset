@@ -18,12 +18,23 @@ NOTES="$DIST/RELEASE_NOTES.md"
 rm -rf "$DIST"
 mkdir -p "$STAGE"
 
-# make_app.sh 负责编译、生成图标、组装 bundle。
-# 给它一个临时目录当安装目标，别真的装到 /Applications。
+# make_app.sh 会用 logo.png 重新生成图标，但没装 PIL 时会回退到 sips，
+# 而 sips 把 1310x1200 的源图硬压成正方形，按钮被拉扁还裁掉了边。
+# 仓库里已有一份做好的图标，先备份，跑完再放回去。
+ICON="Resources/AppIcon.icns"
+ICON_BACKUP="$(mktemp -t codexreset-icon)"
+cp "$ICON" "$ICON_BACKUP"
+
 INSTALL_DIR="$PWD/$STAGE" ./make_app.sh
+
+cp "$ICON_BACKUP" "$ICON"
+rm -f "$ICON_BACKUP"
 
 APP="$STAGE/$APP_NAME.app"
 [ -d "$APP" ] || { echo "错误：$APP 未生成" >&2; exit 1; }
+
+# bundle 里那份也是重新生成的，一并换回来
+cp "$ICON" "$APP/Contents/Resources/AppIcon.icns"
 
 # 重新做 ad-hoc 签名。make_app.sh 会优先用本机的 Apple Development 证书，
 # 但那种证书一旦吊销，下载方的 macOS 会直接判定为恶意软件，而不是普通的
