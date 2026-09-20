@@ -15,7 +15,7 @@ command) the moment your usage is back** — so you never have to babysit the
 
 ---
 
-> **Fork of [boyso/codex-reset](https://github.com/boyso/codex-reset), maintained by Arturo UX.**
+> **Fork of [boyso/codex-reset](https://github.com/boyso/codex-reset), maintained by [Arturo UX](https://github.com/arthurglaizal).**
 >
 > It fixes the paused-chat detection (chats continued by hand stayed listed as
 > paused forever), adds an ignore list and a no-ticking auto-resume mode, reports
@@ -82,7 +82,7 @@ Two channels, most reliable first:
 ### Build
 
 ```bash
-git clone https://github.com/boyso/codex-reset.git
+git clone https://github.com/arthurglaizal/codex-reset.git
 cd codex-reset
 swift build -c release
 ```

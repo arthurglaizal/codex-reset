@@ -1,7 +1,7 @@
 # What this fork changes
 
 Fork of [boyso/codex-reset](https://github.com/boyso/codex-reset), started from
-commit `10def85`. Maintained by Arturo UX.
+commit `10def85`. Maintained by [Arturo UX](https://github.com/arthurglaizal).
 
 The list below is grouped by what each change answers: **what was broken**,
 **what was missing**, and **what moved on screen**. A maintainer looking to pick
