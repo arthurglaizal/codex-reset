@@ -24,7 +24,7 @@ command) the moment your usage is back** — so you never have to babysit the
 >
 > Full list of differences: **[FORK.md](FORK.md)**
 
-<img src="docs/fork-preview.png" width="800" alt="CodexReset fork, dark mode: paused chats with status chips, ignore buttons, reset countdown and quota gauges">
+<img src="docs/fork-preview.png" width="800" alt="CodexReset fork in dark mode: paused chats grouped by project, each with a turn count, a pause chip and an ignore button; on the right the auto-continue card, the reset countdown and the quota gauges">
 
 ## Why
 
