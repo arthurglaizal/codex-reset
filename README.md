@@ -9,6 +9,8 @@
 > Full list of differences: **[FORK.md](FORK.md)**. Everything below is the
 > original documentation and still applies.
 
+<img src="docs/fork-preview.png" width="800" alt="CodexReset fork, dark mode: paused chats with status chips, ignore buttons, reset countdown and quota gauges">
+
 
 <img width="1280" height="258" alt="image" src="https://github.com/user-attachments/assets/766c58f1-5264-469b-b641-bfe8787caefa" />
 
