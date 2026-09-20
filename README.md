@@ -1,17 +1,5 @@
 # CodexReset
 
-> **Fork of [boyso/codex-reset](https://github.com/boyso/codex-reset), maintained by Arturo UX.**
->
-> It fixes the paused-chat detection (chats continued by hand stayed listed as
-> paused forever), adds an ignore list and a no-ticking auto-resume mode, reports
-> quota the way Codex does, and ships a dark mode.
->
-> Full list of differences: **[FORK.md](FORK.md)**. Everything below is the
-> original documentation and still applies.
-
-<img src="docs/fork-preview.png" width="800" alt="CodexReset fork, dark mode: paused chats with status chips, ignore buttons, reset countdown and quota gauges">
-
-
 <img width="1280" height="258" alt="image" src="https://github.com/user-attachments/assets/766c58f1-5264-469b-b641-bfe8787caefa" />
 
 **An app that keeps Codex on the job.**
@@ -27,11 +15,16 @@ command) the moment your usage is back** — so you never have to babysit the
 
 ---
 
+> **Fork of [boyso/codex-reset](https://github.com/boyso/codex-reset), maintained by Arturo UX.**
+>
+> It fixes the paused-chat detection (chats continued by hand stayed listed as
+> paused forever), adds an ignore list and a no-ticking auto-resume mode, reports
+> quota the way Codex does, and ships a dark mode. Everything else below is the
+> original documentation and still applies.
+>
+> Full list of differences: **[FORK.md](FORK.md)**
 
-<img width="2048" height="1218" alt="image" src="https://github.com/user-attachments/assets/c4ddef65-c347-40ff-8487-13db60605e76" />
-
-
-
+<img src="docs/fork-preview.png" width="800" alt="CodexReset fork, dark mode: paused chats with status chips, ignore buttons, reset countdown and quota gauges">
 
 ## Why
 
