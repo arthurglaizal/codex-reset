@@ -286,28 +286,30 @@ struct ContentView: View {
         }
     }
 
-    /// 状态点取两个窗口中最紧张的那个：只看 5 小时窗口会在周额度见底时仍显示绿色
+    /// 「配置」行讲的是与 Codex 的连接是否就绪，额度本身由右侧柱子表达
     private var statusColor: Color {
-        guard let rl = model.rateLimits?.rateLimits else { return .gray }
-        let remaining = [rl.primary, rl.secondary]
-            .compactMap { $0 }
-            .map { 100 - $0.usedPercent }
-        guard let worst = remaining.min() else { return .gray }
-        return quotaColor(worst)
+        if model.connectionMode == "none" { return .red }
+        if model.rateLimits == nil { return .gray }
+        if (model.rateLimits?.rateLimits.primary?.usedPercent ?? 0) >= 100 { return .orange }
+        return .green
     }
 
     private var statusText: String {
-        guard let rl = model.rateLimits else {
-            return model.lastError ?? L("连接中…", "Connecting…")
+        if model.connectionMode == "none" {
+            return model.lastError ?? L("未连接到 Codex", "Not connected to Codex")
         }
-        let used = rl.rateLimits.primary?.usedPercent ?? 0
-        if used >= 100 {
+        guard let rl = model.rateLimits else {
+            return L("正在连接 Codex…", "Connecting to Codex…")
+        }
+        if (rl.rateLimits.primary?.usedPercent ?? 0) >= 100 {
             if let cd = model.countdownText() {
-                return L("已到用量上限 · \(cd)后恢复", "Usage limit reached · resets in \(cd)")
+                return L("已到用量上限，\(cd)后恢复", "Usage limit reached, resets in \(cd)")
             }
             return L("已到用量上限", "Usage limit reached")
         }
-        return L("用量正常", "Usage OK")
+        return model.connectionMode == "desktop-control"
+            ? L("已连接 Codex（官方协议）", "Connected to Codex (official protocol)")
+            : L("已连接 Codex（独立 app-server）", "Connected to Codex (standalone app-server)")
     }
 
     // MARK: - 用量（固定显示在顶部）

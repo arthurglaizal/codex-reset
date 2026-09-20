@@ -84,7 +84,7 @@ final class MenuBarController: NSObject {
     /// 两行标题：上面小字「codex」，下面是剩余额度
     private func stackedTitle(top: String, bottom: String) -> NSAttributedString {
         let style = NSMutableParagraphStyle()
-        style.alignment = .center
+        style.alignment = .left
         style.lineSpacing = -2
         let result = NSMutableAttributedString()
         result.append(NSAttributedString(string: top + "\n", attributes: [
