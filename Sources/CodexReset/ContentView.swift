@@ -71,9 +71,9 @@ struct ContentView: View {
             VStack(alignment: .leading, spacing: 10) {
                 pausedSection
                 Divider()
-                continuedSection
-                Divider()
                 ignoredSection
+                Divider()
+                continuedSection
                 if showAllThreads {
                     Divider()
                     allSection
@@ -778,21 +778,31 @@ struct ContentView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    /// 忽略 / 恢复按钮：忽略后这条对话从所有列表消失，自动继续也跳过它
+    /// 忽略 / 恢复按钮。
+    /// 刻意用不对称的一对：眼睛图标说的是「看不看得见」，这里做的却是
+    /// 「要不要自动继续」，而且对称的开关无法分辨图标描述的是现状还是动作。
+    @ViewBuilder
     private func ignoreButton(_ paused: PausedThread) -> some View {
-        let ignored = isIgnored(paused)
-        return Button {
-            model.setIgnored(!ignored, threadId: paused.threadId)
-        } label: {
-            Image(systemName: ignored ? "eye" : "eye.slash")
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
+        if isIgnored(paused) {
+            // 「已忽略」列表里有地方放文字，比任何图标都清楚
+            Button(L("恢复", "Restore")) {
+                model.setIgnored(false, threadId: paused.threadId)
+            }
+            .font(.caption)
+            .help(L("把这条对话放回原来的列表", "Put this chat back in its list"))
+        } else {
+            Button {
+                model.setIgnored(true, threadId: paused.threadId)
+            } label: {
+                Image(systemName: "minus.circle")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .help(L("忽略这条对话：不再出现在列表，也不会被自动继续",
+                    "Ignore this chat: it leaves the lists and is never continued automatically"))
+            .accessibilityLabel(L("忽略这条对话", "Ignore this chat"))
         }
-        .buttonStyle(.plain)
-        .help(ignored
-              ? L("恢复这条对话", "Bring this chat back")
-              : L("忽略这条对话：不再出现在列表，也不会被自动继续",
-                  "Ignore this chat: it leaves the lists and is never continued automatically"))
     }
 
     /// 状态胶囊：图标 + 文字同色，贴在行尾。
