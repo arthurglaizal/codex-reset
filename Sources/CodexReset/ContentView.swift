@@ -533,6 +533,8 @@ struct ContentView: View {
         Button {
             withAnimation(.easeInOut(duration: 0.15)) {
                 openSection = isOpen ? nil : section
+                // le filtre appartient a la section qu'on quitte
+                searchText = ""
             }
         } label: {
             HStack(spacing: 6) {
@@ -590,12 +592,18 @@ struct ContentView: View {
                        "These chats were continued after hitting the limit. They don't need resuming."))
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                searchField
+                let threads = matchingSearch(continuedThreads)
                 if continuedThreads.isEmpty {
                     Text(L("暂无", "None"))
                         .font(.caption)
                         .foregroundStyle(.tertiary)
+                } else if threads.isEmpty {
+                    Text(L("没有匹配的对话", "No chat matches your search"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 } else {
-                    threadList(continuedThreads, showRecovery: true)
+                    threadList(threads, showRecovery: true)
                 }
             }
         }
@@ -647,33 +655,58 @@ struct ContentView: View {
             }
 
             if isOpen {
-                threadList(model.allThreads, showRecovery: false)
+                searchField
+                let threads = matchingSearch(model.allThreads)
+                if threads.isEmpty {
+                    Text(L("没有匹配的对话", "No chat matches your search"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    threadList(threads, showRecovery: false)
+                }
             }
         }
         .frame(maxHeight: isOpen ? .infinity : nil, alignment: .top)
     }
 
-    /// 模式 `.all` 下勾选没有意义，直接去掉复选框只留内容
-    @ViewBuilder
+    /// 整行是一张卡片，复选框放在卡片内部，卡片才能和项目名左对齐。
+    /// 模式 `.all` 下勾选没有意义，直接不画复选框。
     private func threadRow(_ paused: PausedThread, showRecovery: Bool) -> some View {
-        if model.autoMode == .all {
-            threadRowLabel(paused, showRecovery: showRecovery)
-                .padding(.leading, 3)
-        } else {
-            Toggle(isOn: Binding(
-                get: { model.selectedThreadIds.contains(paused.threadId) },
-                set: { on in
-                    if on {
-                        model.selectedThreadIds.insert(paused.threadId)
-                    } else {
-                        model.selectedThreadIds.remove(paused.threadId)
+        HStack(alignment: .top, spacing: 8) {
+            if model.autoMode != .all {
+                Toggle("", isOn: Binding(
+                    get: { model.selectedThreadIds.contains(paused.threadId) },
+                    set: { on in
+                        if on {
+                            model.selectedThreadIds.insert(paused.threadId)
+                        } else {
+                            model.selectedThreadIds.remove(paused.threadId)
+                        }
                     }
-                }
-            )) {
-                threadRowLabel(paused, showRecovery: showRecovery)
+                ))
+                .labelsHidden()
+                .toggleStyle(.checkbox)
             }
-            .toggleStyle(.checkbox)
+            threadRowLabel(paused, showRecovery: showRecovery)
         }
+        .padding(.vertical, 5)
+        .padding(.horizontal, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(Color.white.opacity(0.55))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .strokeBorder(Color.black.opacity(0.05), lineWidth: 1)
+        )
+        .opacity(showRecovery && !paused.isStillPaused ? 0.6 : 1)
+        .contentShape(Rectangle())
+        // 双击在 Codex 中打开该对话
+        .onTapGesture(count: 2) {
+            model.openInCodex(threadId: paused.threadId)
+        }
+        .help(L("双击在 Codex 中打开该对话", "Double-click to open in Codex"))
     }
 
     private func threadRowLabel(_ paused: PausedThread, showRecovery: Bool) -> some View {
@@ -696,7 +729,6 @@ struct ContentView: View {
                     .lineLimit(1)
                 Spacer(minLength: 6)
                 if showRecovery {
-                    // 右列与指示图标同色：卡住显示恢复时间，已继续显示「已继续」
                     if paused.isStillPaused, let hint = paused.recoveryHint {
                         Text(cleanHint(hint))
                             .font(.system(size: 12, weight: .semibold))
@@ -708,8 +740,8 @@ struct ContentView: View {
                     }
                 }
             }
-            // 标题常被自动「继续」覆盖，副标题给出真正在做什么
-            if let preview = paused.lastUserMessage, !preview.isEmpty {
+            // 副标题只在和标题不同时才有信息量
+            if let preview = paused.lastUserMessage, !isRedundant(preview, with: paused.title) {
                 Text(preview)
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
@@ -717,24 +749,13 @@ struct ContentView: View {
                     .truncationMode(.tail)
             }
         }
-        .padding(.vertical, 5)
-        .padding(.horizontal, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(Color.white.opacity(0.55))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .strokeBorder(Color.black.opacity(0.05), lineWidth: 1)
-        )
-        .opacity(showRecovery && !paused.isStillPaused ? 0.6 : 1)
-        .contentShape(Rectangle())
-        // 双击在 Codex 中打开该对话
-        .onTapGesture(count: 2) {
-            model.openInCodex(threadId: paused.threadId)
-        }
-        .help(L("双击在 Codex 中打开该对话", "Double-click to open in Codex"))
+    }
+
+    /// 副标题是否只是标题的重复
+    private func isRedundant(_ preview: String, with title: String) -> Bool {
+        let head = String(title.prefix(24))
+        return preview.isEmpty || preview.hasPrefix(head)
     }
 
     /// 去掉恢复提示末尾的句点，如 "7:27 PM." -> "7:27 PM"
