@@ -1,6 +1,6 @@
 # CodexReset
 
-<img width="1280" height="258" alt="image" src="https://github.com/user-attachments/assets/766c58f1-5264-469b-b641-bfe8787caefa" />
+<img src="docs/logo-banner.png" width="150" alt="CodexReset logo: a red emergency button">
 
 **An app that keeps Codex on the job.**
 
