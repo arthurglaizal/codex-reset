@@ -37,6 +37,7 @@ final class MenuBarController: NSObject {
         popover = NSPopover()
         popover.contentSize = NSSize(width: 900, height: 840)
         popover.behavior = .transient
+        popover.appearance = NSAppearance(named: AppearanceSetting.current == .dark ? .darkAqua : .aqua)
         popover.contentViewController = hosting
 
         // 数据变化时刷新标题
@@ -169,11 +170,11 @@ final class MenuBarController: NSObject {
             win.styleMask = [.titled, .closable, .utilityWindow]
             win.isReleasedWhenClosed = false
             win.isMovableByWindowBackground = true
-            // 窗口外观固定浅色，避免标题栏与浅色内容不一致
-            win.appearance = NSAppearance(named: .aqua)
             settingsWindow = win
         }
         guard let win = settingsWindow else { return }
+        // 标题栏跟随面板的外观设置，否则深浅不一致
+        win.appearance = NSAppearance(named: AppearanceSetting.current == .dark ? .darkAqua : .aqua)
         if !win.isVisible {
             // 首次打开放到主屏中央
             if let screen = NSScreen.main {
@@ -189,6 +190,8 @@ final class MenuBarController: NSObject {
     }
 
     @objc private func togglePopover() {
+        // 设置可能在上次打开后改过
+        popover.appearance = NSAppearance(named: AppearanceSetting.current == .dark ? .darkAqua : .aqua)
         guard let button = statusItem.button else { return }
         if popover.isShown {
             popover.performClose(nil)

@@ -1,7 +1,5 @@
 import SwiftUI
 
-/// 强调橙：浅色主题下的主色（按钮/恢复时间高亮），保证白字按钮对比与文字可读
-private let highlightOrange = Color(red: 0.72, green: 0.33, blue: 0.10)
 /// 柱子本体的高度，刻度和分隔线都按它对齐
 private let gaugeBarHeight: CGFloat = 128
 /// 柱子上方（标题 + 百分比）占用的高度
@@ -31,6 +29,13 @@ struct ContentView: View {
     @State private var selectedTab = 0
     /// 是否在概览中显示「全部对话」模块
     @AppStorage("showAllThreads") private var showAllThreads = true
+    /// 外观：深色 / 浅色，默认深色
+    @AppStorage("appearance") private var appearanceRaw = AppearanceSetting.dark.rawValue
+
+    private var appearance: AppearanceSetting {
+        AppearanceSetting(rawValue: appearanceRaw) ?? .dark
+    }
+    private var theme: Palette { Palette(appearance) }
     /// 自动继续的作用范围（关闭总开关后仍保留，重新打开时沿用）
     @AppStorage("autoScopeAll") private var autoScopeAll = false
 
@@ -51,8 +56,8 @@ struct ContentView: View {
         .padding(14)
         .frame(width: 880, height: 800, alignment: .top)
         // 浅色主题：全不透明浅色背景
-        .background(Color(red: 0.95, green: 0.945, blue: 0.93))
-        .preferredColorScheme(.light)
+        .background(theme.windowBackground)
+        .preferredColorScheme(appearance.colorScheme)
         .onAppear {
             model.refreshAllThreads()
             // 保存的模式是权威来源，启动时把范围开关对齐到它
@@ -113,7 +118,7 @@ struct ContentView: View {
     /// 额度还有时它只是当前窗口的剩余时间，所以配色和文案都跟着变。
     private var resetCountdown: some View {
         let blocked = (model.rateLimits?.rateLimits.primary?.usedPercent ?? 0) >= 100
-        let tint = blocked ? highlightOrange : Color.secondary
+        let tint = blocked ? theme.accent : Color.secondary
         return HStack(alignment: .center, spacing: 8) {
             Image(systemName: blocked ? "hourglass" : "clock")
                 .font(.system(size: 16))
@@ -261,7 +266,7 @@ struct ContentView: View {
         HStack(spacing: 5) {
             Image(systemName: ok ? "circle.fill" : "xmark")
                 .font(.system(size: ok ? 7 : 9, weight: ok ? .regular : .semibold))
-                .foregroundStyle(ok ? Color(red: 0.10, green: 0.68, blue: 0.42) : Color.secondary)
+                .foregroundStyle(ok ? theme.ok : Color.secondary)
             Text(text)
                 .foregroundStyle(.secondary)
         }
@@ -284,6 +289,15 @@ struct ContentView: View {
             }
             .pickerStyle(.segmented)
             .frame(width: 330)
+
+            Picker("", selection: $appearanceRaw) {
+                Image(systemName: "moon.fill").tag(AppearanceSetting.dark.rawValue)
+                Image(systemName: "sun.max.fill").tag(AppearanceSetting.light.rawValue)
+            }
+            .pickerStyle(.segmented)
+            .frame(width: 76)
+            .help(L("切换深色 / 浅色外观", "Switch between dark and light appearance"))
+
             Spacer()
                 .frame(width: 4)
             // 右上角：设置（打开独立设置窗口）
@@ -362,7 +376,7 @@ struct ContentView: View {
                     // 自动继续跟的是这个窗口
                     Image(systemName: "bolt.fill")
                         .font(.system(size: 11))
-                        .foregroundStyle(highlightOrange)
+                        .foregroundStyle(theme.accent)
                 }
                 Text(title)
                     .font(.system(size: 14, weight: .semibold))
@@ -373,7 +387,7 @@ struct ContentView: View {
                 .foregroundStyle(tint)
             ZStack(alignment: .bottom) {
                 RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(Color.black.opacity(0.06))
+                    .fill(theme.gaugeTrack)
                 RoundedRectangle(cornerRadius: 6, style: .continuous)
                     .fill(tint)
                     .frame(height: max(4, gaugeBarHeight * CGFloat(remaining) / 100))
@@ -409,9 +423,9 @@ struct ContentView: View {
 
     /// 剩余额度配色：充足=绿，低于 30%=橙，低于 10%=红
     private func quotaColor(_ remaining: Int) -> Color {
-        if remaining < 10 { return Color(red: 0.80, green: 0.18, blue: 0.16) }
-        if remaining < 30 { return Color(red: 0.86, green: 0.50, blue: 0.10) }
-        return Color(red: 0.10, green: 0.68, blue: 0.42)
+        if remaining < 10 { return theme.danger }
+        if remaining < 30 { return theme.warn }
+        return theme.ok
     }
 
     /// 距离该窗口重置还有多久；超过一天时带上天数（周窗口用得上）
@@ -508,11 +522,11 @@ struct ContentView: View {
         .padding(.vertical, 6)
         .background(
             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(Color.white.opacity(0.75))
+                .fill(theme.fieldFill)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .strokeBorder(Color.black.opacity(0.08), lineWidth: 1)
+                .strokeBorder(theme.hairline, lineWidth: 1)
         )
     }
 
@@ -753,11 +767,11 @@ struct ContentView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(Color.white.opacity(0.55))
+                .fill(theme.rowFill)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .strokeBorder(Color.black.opacity(0.05), lineWidth: 1)
+                .strokeBorder(theme.hairline, lineWidth: 1)
         )
         .contentShape(Rectangle())
         // 双击在 Codex 中打开该对话
@@ -793,10 +807,10 @@ struct ContentView: View {
             Label(L("双击在 Codex 中打开该对话", "Double-click to open in Codex"),
                   systemImage: "arrow.up.forward.app")
                 .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(highlightOrange)
+                .foregroundStyle(theme.accent)
 
             Divider()
-                .overlay(Color.black.opacity(0.06))
+                .overlay(theme.hairline)
 
             Text(L("对话标题", "Chat title"))
                 .font(.system(size: 10, weight: .semibold))
@@ -814,7 +828,7 @@ struct ContentView: View {
         }
         .padding(14)
         .frame(width: 400)
-        .background(Color(red: 0.99, green: 0.985, blue: 0.975))
+        .background(theme.hoverBackground)
     }
 
     private func threadRowLabel(_ paused: PausedThread, showRecovery: Bool) -> some View {
@@ -866,7 +880,7 @@ struct ContentView: View {
             .foregroundStyle(.secondary)
             .padding(.horizontal, 7)
             .padding(.vertical, 2)
-            .overlay(Capsule().strokeBorder(Color.black.opacity(0.16), lineWidth: 1))
+            .overlay(Capsule().strokeBorder(theme.controlBorder, lineWidth: 1))
             .contentShape(Capsule())
         }
         .buttonStyle(.plain)
@@ -881,13 +895,13 @@ struct ContentView: View {
         if paused.isStillPaused {
             chip(symbol: pausedSymbol,
                  text: paused.recoveryHint.map(cleanHint) ?? L("暂停中", "Paused"),
-                 tint: highlightOrange,
+                 tint: theme.accent,
                  help: L("暂停仍是最后一轮，对话仍处于暂停",
                          "The pause is the last message, so this chat is still paused"))
         } else {
             chip(symbol: resumedSymbol,
                  text: L("已继续", "Resumed"),
-                 tint: Color(red: 0.08, green: 0.48, blue: 0.30),
+                 tint: theme.resumed,
                  help: L("失败之后对话已被继续过，无需再次继续",
                          "The chat was continued after the pause, so it needs nothing"))
         }
@@ -940,13 +954,13 @@ struct ContentView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(Color.white)
+                    .fill(theme.cardBackground)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .strokeBorder(
                         LinearGradient(
-                            colors: [Color.white, Color.black.opacity(0.06)],
+                            colors: [theme.cardBackground, theme.hairline],
                             startPoint: .top, endPoint: .bottom
                         ),
                         lineWidth: 1
@@ -996,7 +1010,7 @@ struct ContentView: View {
                 resetCountdown
             }
             Divider()
-                .overlay(Color.black.opacity(0.05))
+                .overlay(theme.hairline)
 
             // 总开关 + 作用范围复选框（三种模式互斥，但拆成「开关」与「范围」更易读）
             VStack(alignment: .leading, spacing: 8) {
@@ -1028,7 +1042,7 @@ struct ContentView: View {
             }
 
             Divider()
-                .overlay(Color.black.opacity(0.05))
+                .overlay(theme.hairline)
 
             // 指令输入（默认收起，点标题展开）
             VStack(alignment: .leading, spacing: 6) {
@@ -1087,7 +1101,7 @@ struct ContentView: View {
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
                         .fill(
                             LinearGradient(
-                                colors: [Color(red: 0.86, green: 0.45, blue: 0.15), highlightOrange],
+                                colors: [theme.accentBright, theme.accent],
                                 startPoint: .top, endPoint: .bottom
                             )
                         )
@@ -1130,7 +1144,7 @@ struct ContentView: View {
                 }
                 .frame(maxHeight: 400)
                 .frame(maxWidth: .infinity)
-                .background(Color.black.opacity(0.03))
+                .background(theme.wellBackground)
                 .cornerRadius(6)
             }
         }

@@ -5,13 +5,20 @@ struct SettingsPanelView: View {
     @EnvironmentObject var model: AppModel
     /// 是否在概览中显示「全部对话」模块
     @AppStorage("showAllThreads") private var showAllThreads = true
+    /// 外观跟随主面板的选择
+    @AppStorage("appearance") private var appearanceRaw = AppearanceSetting.dark.rawValue
+
+    private var appearance: AppearanceSetting {
+        AppearanceSetting(rawValue: appearanceRaw) ?? .dark
+    }
+    private var theme: Palette { Palette(appearance) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
                 Image(systemName: "gearshape.fill")
                     .font(.system(size: 15))
-                    .foregroundStyle(Color(red: 0.72, green: 0.33, blue: 0.10))
+                    .foregroundStyle(theme.accent)
                 Text(L("设置", "Settings"))
                     .font(.headline)
             }
@@ -19,9 +26,9 @@ struct SettingsPanelView: View {
         }
         .padding(16)
         .frame(width: 340)
-        .background(Color(red: 0.95, green: 0.945, blue: 0.93))
-        // 与主面板一致强制浅色：配色为固定浅色，跟随系统深色会出现白字白底
-        .preferredColorScheme(.light)
+        .background(theme.windowBackground)
+        // 外观由面板设置决定，不跟随系统，否则写死的配色会出现白字白底
+        .preferredColorScheme(appearance.colorScheme)
     }
 
     /// 语言选择绑定到 AppModel.language（切换后经 objectWillChange 刷新全界面）
@@ -48,7 +55,7 @@ struct SettingsPanelView: View {
                     "Show all chats in Overview so any chat can be selected for auto-continue."))
 
             Divider()
-                .overlay(Color.black.opacity(0.05))
+                .overlay(theme.hairline)
 
             // 语言
             HStack(spacing: 10) {
@@ -65,7 +72,7 @@ struct SettingsPanelView: View {
             }
 
             Divider()
-                .overlay(Color.black.opacity(0.05))
+                .overlay(theme.hairline)
 
             // remote_control
             VStack(alignment: .leading, spacing: 3) {
@@ -89,11 +96,11 @@ struct SettingsPanelView: View {
         .padding(14)
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color.white)
+                .fill(theme.cardBackground)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(Color.black.opacity(0.07), lineWidth: 1)
+                .strokeBorder(theme.hairline, lineWidth: 1)
         )
     }
 }
