@@ -22,6 +22,9 @@ struct ContentView: View {
     @State private var openSection: OverviewSection? = .paused
     /// 「暂停的对话」列表的搜索词（对话标题 + 项目路径）
     @State private var searchText = ""
+    /// 悬停提示当前显示的对话；hoverCandidate 用于延时，避免扫过列表时乱弹
+    @State private var hoveredThreadId: String?
+    @State private var hoverCandidate: String?
     /// 自定义指令输入区展开状态：默认展开，并记住用户的选择
     @AppStorage("commandExpanded") private var commandExpanded = true
     /// 当前 Tab：0=概览 1=用量历史 2=日志
@@ -761,7 +764,57 @@ struct ContentView: View {
         .onTapGesture(count: 2) {
             model.openInCodex(threadId: paused.threadId)
         }
-        .help(L("双击在 Codex 中打开该对话", "Double-click to open in Codex"))
+        .onHover { inside in
+            let id = paused.threadId
+            if inside {
+                hoverCandidate = id
+                // 停留半秒才弹，快速滑过列表时不会闪一片
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    if hoverCandidate == id { hoveredThreadId = id }
+                }
+            } else {
+                if hoverCandidate == id { hoverCandidate = nil }
+                if hoveredThreadId == id { hoveredThreadId = nil }
+            }
+        }
+        .popover(isPresented: Binding(
+            get: { hoveredThreadId == paused.threadId },
+            set: { shown in
+                if !shown, hoveredThreadId == paused.threadId { hoveredThreadId = nil }
+            }
+        ), arrowEdge: .bottom) {
+            hoverCard(paused)
+        }
+    }
+
+    /// 悬停卡片：系统 tooltip 只能给一行灰字，这里要放操作提示 + 完整消息
+    private func hoverCard(_ paused: PausedThread) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label(L("双击在 Codex 中打开该对话", "Double-click to open in Codex"),
+                  systemImage: "arrow.up.forward.app")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(highlightOrange)
+
+            Divider()
+                .overlay(Color.black.opacity(0.06))
+
+            Text(L("对话标题", "Chat title"))
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .textCase(.uppercase)
+
+            // Le titre est ellipse dans la liste : ici on le donne en entier
+            ScrollView {
+                Text(paused.title)
+                    .font(.system(size: 12))
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .frame(maxHeight: 240)
+        }
+        .padding(14)
+        .frame(width: 400)
+        .background(Color(red: 0.99, green: 0.985, blue: 0.975))
     }
 
     private func threadRowLabel(_ paused: PausedThread, showRecovery: Bool) -> some View {

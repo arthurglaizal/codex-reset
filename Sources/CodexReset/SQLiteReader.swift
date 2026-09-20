@@ -145,7 +145,7 @@ final class SQLiteReader {
         return result
     }
 
-    /// 从 thread_items.item_json 里取出用户消息正文，只保留前 120 字（够当标题）
+    /// 从 thread_items.item_json 里取出用户消息正文，只保留前 300 字（列表会截断，悬停时展示全文）
     static func extractText(fromItemJSON json: String) -> String? {
         guard let data = json.data(using: .utf8),
               let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -170,13 +170,13 @@ final class SQLiteReader {
         let body = lines[index...]
             .joined(separator: " ")
             .trimmingCharacters(in: .whitespacesAndNewlines)
-        if !body.isEmpty { return String(body.prefix(120)) }
+        if !body.isEmpty { return String(body.prefix(300)) }
         if attachments > 0 {
             return L("附带 \(attachments) 个文件", "\(attachments) file(s) attached")
         }
         let fallback = raw.replacingOccurrences(of: "\n", with: " ")
             .trimmingCharacters(in: .whitespacesAndNewlines)
-        return fallback.isEmpty ? nil : String(fallback.prefix(120))
+        return fallback.isEmpty ? nil : String(fallback.prefix(300))
     }
 
     /// 判断是否为子代理线程    /// 判断是否为子代理线程    /// 判断是否为子代理线程（state 库 source 以 {"subagent" 开头）
@@ -194,7 +194,10 @@ final class SQLiteReader {
     /// 显示用标题：优先 state 里的标题，太短或缺失时用首条消息兜底
     private func displayTitle(stateTitle: String?, firstMessage: String?) -> String {
         if let stateTitle, stateTitle.count >= 3 { return stateTitle }
-        if let firstMessage, !firstMessage.isEmpty { return String(firstMessage.prefix(60)) }
+        if let firstMessage, !firstMessage.isEmpty {
+            // pas de coupe ici : la liste ellipse, la carte de survol montre tout
+            return firstMessage.replacingOccurrences(of: "\n", with: " ")
+        }
         return L("未命名对话", "Untitled chat")
     }
 
