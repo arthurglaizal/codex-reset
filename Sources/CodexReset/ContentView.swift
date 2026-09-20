@@ -1086,7 +1086,7 @@ struct ContentView: View {
                     if model.isWorking {
                         ProgressView()
                             .controlSize(.small)
-                            .tint(.white)
+                            .tint(theme.buttonText)
                         Text(L("继续中…", "Continuing…"))
                     } else {
                         Image(systemName: "paperplane.fill")
@@ -1094,17 +1094,12 @@ struct ContentView: View {
                     }
                 }
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.white)
+                .foregroundStyle(theme.buttonText)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 9)
                 .background(
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [theme.accentBright, theme.accent],
-                                startPoint: .top, endPoint: .bottom
-                            )
-                        )
+                        .fill(theme.buttonFill)
                 )
             }
             .buttonStyle(.plain)

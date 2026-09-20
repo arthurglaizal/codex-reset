@@ -27,10 +27,14 @@ struct Palette {
         isDark ? Color(red: 0.98, green: 0.62, blue: 0.30)
                : Color(red: 0.72, green: 0.33, blue: 0.10)
     }
-    /// 「立即继续」按钮的渐变起点
-    var accentBright: Color {
-        isDark ? Color(red: 0.95, green: 0.50, blue: 0.20)
-               : Color(red: 0.86, green: 0.45, blue: 0.15)
+    /// 实心按钮的底色。深色下橙色必须够亮才有存在感，
+    /// 亮橙配白字对比不足，所以那种情况下按钮文字改用深色。
+    var buttonFill: Color {
+        isDark ? Color(red: 0.97, green: 0.60, blue: 0.26)
+               : Color(red: 0.72, green: 0.33, blue: 0.10)
+    }
+    var buttonText: Color {
+        isDark ? Color(red: 0.13, green: 0.10, blue: 0.07) : .white
     }
     /// 面板底色
     var windowBackground: Color {
