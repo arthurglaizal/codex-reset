@@ -45,7 +45,7 @@ struct ContentView: View {
             footer
         }
         .padding(14)
-        .frame(width: 900, height: 800, alignment: .top)
+        .frame(width: 880, height: 800, alignment: .top)
         // 浅色主题：全不透明浅色背景
         .background(Color(red: 0.95, green: 0.945, blue: 0.93))
         .preferredColorScheme(.light)
@@ -724,44 +724,52 @@ struct ContentView: View {
     }
 
     private func threadRowLabel(_ paused: PausedThread, showRecovery: Bool) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 6) {
-            if showRecovery {
-                let label = paused.isStillPaused
-                    ? L("暂停仍是最后一轮，对话仍处于暂停",
-                        "The pause is the last message, so this chat is still paused")
-                    : L("失败之后对话已被继续过，无需再次继续",
-                        "The chat was continued after the pause, so it needs nothing")
-                Image(systemName: paused.isStillPaused ? pausedSymbol : resumedSymbol)
-                    .font(.system(size: 11))
-                    .foregroundStyle(paused.isStillPaused ? highlightOrange : Color.secondary)
-                    .help(label)
-                    .accessibilityLabel(label)
-            }
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
             Text(paused.title)
                 .font(.system(size: 13, weight: .medium))
                 .lineLimit(1)
-            if showRecovery, !paused.isStillPaused {
-                resumedTag
-            }
             Spacer(minLength: 6)
             turnCountTag(paused.turnCount)
-            if showRecovery, paused.isStillPaused, let hint = paused.recoveryHint {
-                Text(cleanHint(hint))
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(highlightOrange)
+            if showRecovery {
+                statusChip(paused)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    /// 「已继续」标签：紧贴标题，卡片本身保持正常对比度
-    private var resumedTag: some View {
-        Text(L("已继续", "Resumed"))
-            .font(.system(size: 10, weight: .medium))
-            .foregroundStyle(Color(red: 0.08, green: 0.48, blue: 0.30))
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(Capsule().fill(quotaColor(100).opacity(0.14)))
+    /// 状态胶囊：图标 + 文字同色，贴在行尾。
+    /// 暂停的显示恢复时间，已继续的显示「已继续」，两种共用一个形状。
+    @ViewBuilder
+    private func statusChip(_ paused: PausedThread) -> some View {
+        if paused.isStillPaused {
+            chip(symbol: pausedSymbol,
+                 text: paused.recoveryHint.map(cleanHint) ?? L("暂停中", "Paused"),
+                 tint: highlightOrange,
+                 help: L("暂停仍是最后一轮，对话仍处于暂停",
+                         "The pause is the last message, so this chat is still paused"))
+        } else {
+            chip(symbol: resumedSymbol,
+                 text: L("已继续", "Resumed"),
+                 tint: Color(red: 0.08, green: 0.48, blue: 0.30),
+                 help: L("失败之后对话已被继续过，无需再次继续",
+                         "The chat was continued after the pause, so it needs nothing"))
+        }
+    }
+
+    private func chip(symbol: String, text: String, tint: Color, help: String) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: symbol)
+                .font(.system(size: 10))
+            Text(text)
+                .font(.system(size: 10, weight: .medium))
+                .monospacedDigit()
+        }
+        .foregroundStyle(tint)
+        .padding(.horizontal, 7)
+        .padding(.vertical, 2)
+        .background(Capsule().fill(tint.opacity(0.12)))
+        .help(help)
+        .accessibilityLabel(help)
     }
 
     /// 轮次计数：气泡图标 + 数字，用来区分「聊了很久」和「刚起头就停了」
