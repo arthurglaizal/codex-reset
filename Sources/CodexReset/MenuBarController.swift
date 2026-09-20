@@ -61,43 +61,61 @@ final class MenuBarController: NSObject {
         guard model.connectionMode != "connecting",
               model.connectionMode != "none",
               let primary = model.rateLimits?.rateLimits.primary else {
-            button.image = nil
             switch model.connectionMode {
             case "none":
-                button.attributedTitle = stackedTitle(top: "codex", bottom: "⚠️")
+                setStatusImage(remaining: nil, bottom: "⚠️")
             default:
-                button.attributedTitle = stackedTitle(top: "codex", bottom: "…")
+                setStatusImage(remaining: nil, bottom: "…")
             }
             return
         }
 
         // 与面板口径一致：显示**剩余**额度，不是已用
         let remaining = max(0, min(100, 100 - primary.usedPercent))
-        button.image = usageRingImage(remaining: remaining)
-        if remaining == 0, let countdown = model.countdownText() {
-            button.attributedTitle = stackedTitle(top: "codex", bottom: "⏳ \(countdown)")
-        } else {
-            button.attributedTitle = stackedTitle(top: "codex", bottom: "\(remaining)%")
-        }
+        let bottom = (remaining == 0)
+            ? "⏳ " + (model.countdownText() ?? L("已到上限", "limit reached"))
+            : "\(remaining)%"
+        setStatusImage(remaining: remaining, bottom: bottom)
     }
 
-    /// 两行标题：上面小字「codex」，下面是剩余额度
-    private func stackedTitle(top: String, bottom: String) -> NSAttributedString {
-        let style = NSMutableParagraphStyle()
-        style.alignment = .left
-        style.lineSpacing = -2
-        let result = NSMutableAttributedString()
-        result.append(NSAttributedString(string: top + "\n", attributes: [
+    /// 整块画成一张图（环 + 两行文字）。
+    /// 用 attributedTitle 时两行会顶到菜单栏上沿，画图才能真正竖向居中。
+    private func setStatusImage(remaining: Int?, bottom: String) {
+        guard let button = statusItem.button else { return }
+        let height = NSStatusBar.system.thickness
+        let ringSize: CGFloat = 15
+        let gap: CGFloat = 4
+
+        let topStr = NSAttributedString(string: "codex", attributes: [
             .font: NSFont.systemFont(ofSize: 8, weight: .medium),
-            .foregroundColor: NSColor.secondaryLabelColor,
-            .paragraphStyle: style
-        ]))
-        result.append(NSAttributedString(string: bottom, attributes: [
+            .foregroundColor: NSColor.secondaryLabelColor
+        ])
+        let bottomStr = NSAttributedString(string: bottom, attributes: [
             .font: NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .semibold),
-            .foregroundColor: NSColor.labelColor,
-            .paragraphStyle: style
-        ]))
-        return result
+            .foregroundColor: NSColor.labelColor
+        ])
+
+        let ringWidth = remaining == nil ? 0 : ringSize + gap
+        let textWidth = ceil(max(topStr.size().width, bottomStr.size().width))
+        let image = NSImage(size: NSSize(width: ringWidth + textWidth + 2, height: height))
+
+        image.lockFocus()
+        if let remaining {
+            usageRingImage(remaining: remaining)
+                .draw(in: NSRect(x: 0, y: (height - ringSize) / 2,
+                                 width: ringSize, height: ringSize))
+        }
+        // 两行稍微重叠，整块再按菜单栏高度居中
+        let lineGap: CGFloat = 2
+        let blockHeight = topStr.size().height + bottomStr.size().height - lineGap
+        let baseY = (height - blockHeight) / 2
+        bottomStr.draw(at: NSPoint(x: ringWidth, y: baseY))
+        topStr.draw(at: NSPoint(x: ringWidth, y: baseY + bottomStr.size().height - lineGap))
+        image.unlockFocus()
+
+        button.image = image
+        button.imagePosition = .imageOnly
+        button.title = ""
     }
 
     /// 绘制剩余额度环（深/浅菜单栏均清晰）：灰底环 + 彩色剩余弧，弧越短越紧张
