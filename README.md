@@ -1,5 +1,15 @@
 # CodexReset
 
+> **Fork of [boyso/codex-reset](https://github.com/boyso/codex-reset), maintained by Arturo UX.**
+>
+> It fixes the paused-chat detection (chats continued by hand stayed listed as
+> paused forever), adds an ignore list and a no-ticking auto-resume mode, reports
+> quota the way Codex does, and ships a dark mode.
+>
+> Full list of differences: **[FORK.md](FORK.md)**. Everything below is the
+> original documentation and still applies.
+
+
 <img width="1280" height="258" alt="image" src="https://github.com/user-attachments/assets/766c58f1-5264-469b-b641-bfe8787caefa" />
 
 **An app that keeps Codex on the job.**

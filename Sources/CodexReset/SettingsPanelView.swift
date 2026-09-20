@@ -23,12 +23,26 @@ struct SettingsPanelView: View {
                     .font(.headline)
             }
             settingsCard
+            aboutLine
         }
         .padding(16)
         .frame(width: 340)
         .background(theme.windowBackground)
         // 外观由面板设置决定，不跟随系统，否则写死的配色会出现白字白底
         .preferredColorScheme(appearance.colorScheme)
+    }
+
+    /// 关于：注明这是谁的 fork，以及原作者是谁。
+    /// 放设置窗口底部而不是主面板标题栏：署名归署名，别盖过产品名。
+    private var aboutLine: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(L("CodexReset · boyso/codex-reset 的 fork",
+                   "CodexReset · a fork of boyso/codex-reset"))
+            Text(L("界面与功能改动：Arturo UX", "Interface and features by Arturo UX"))
+        }
+        .font(.system(size: 10))
+        .foregroundStyle(.tertiary)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     /// 语言选择绑定到 AppModel.language（切换后经 objectWillChange 刷新全界面）
