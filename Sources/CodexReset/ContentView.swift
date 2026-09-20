@@ -605,12 +605,11 @@ struct ContentView: View {
     /// 按项目分组的滚动列表（暂停 / 已继续 / 全部对话共用）
     private func threadList(_ threads: [PausedThread], showRecovery: Bool) -> some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 16) {
                 ForEach(Array(groupByProject(threads).enumerated()), id: \.offset) { _, group in
-                    VStack(alignment: .leading, spacing: 2) {
+                    VStack(alignment: .leading, spacing: 5) {
                         Text(group.name)
-                            .font(.caption)
-                            .fontWeight(.semibold)
+                            .font(.system(size: 13, weight: .semibold))
                             .foregroundStyle(.secondary)
                         ForEach(group.threads, id: \.threadId) { thread in
                             threadRow(thread, showRecovery: showRecovery)
@@ -618,6 +617,7 @@ struct ContentView: View {
                     }
                 }
             }
+            .padding(.vertical, 2)
         }
         .frame(maxHeight: .infinity)
     }
@@ -677,42 +677,58 @@ struct ContentView: View {
     }
 
     private func threadRowLabel(_ paused: PausedThread, showRecovery: Bool) -> some View {
-        HStack(spacing: 6) {
-            if showRecovery {
-                let label = paused.isStillPaused
-                    ? L("暂停仍是最后一轮，对话确实卡住",
-                        "The pause is the last message, so this chat is really stuck")
-                    : L("失败之后对话已被继续过，无需再次继续",
-                        "The chat was continued after the pause, so it needs nothing")
-                Image(systemName: paused.isStillPaused ? stuckSymbol : resumedSymbol)
-                    .font(.caption)
-                    .foregroundStyle(paused.isStillPaused ? highlightOrange : Color.secondary)
-                    .help(label)
-                    .accessibilityLabel(label)
-            } else {
-                Text("–")
-                    .foregroundStyle(.secondary)
-            }
-            Text(paused.title)
-                .font(.system(size: 14))
-                .lineLimit(1)
-            Spacer(minLength: 4)
-            if showRecovery {
-                // 右列与指示图标同色：卡住显示恢复时间，已继续显示「已继续」
-                if paused.isStillPaused, let hint = paused.recoveryHint {
-                    Text(cleanHint(hint))
-                        .font(.caption)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(highlightOrange)
-                } else if !paused.isStillPaused {
-                    Text(L("已继续", "Resumed"))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                if showRecovery {
+                    let label = paused.isStillPaused
+                        ? L("暂停仍是最后一轮，对话确实卡住",
+                            "The pause is the last message, so this chat is really stuck")
+                        : L("失败之后对话已被继续过，无需再次继续",
+                            "The chat was continued after the pause, so it needs nothing")
+                    Image(systemName: paused.isStillPaused ? stuckSymbol : resumedSymbol)
+                        .font(.system(size: 13))
+                        .foregroundStyle(paused.isStillPaused ? highlightOrange : Color.secondary)
+                        .help(label)
+                        .accessibilityLabel(label)
+                }
+                Text(paused.title)
+                    .font(.system(size: 14, weight: .medium))
+                    .lineLimit(1)
+                Spacer(minLength: 6)
+                if showRecovery {
+                    // 右列与指示图标同色：卡住显示恢复时间，已继续显示「已继续」
+                    if paused.isStillPaused, let hint = paused.recoveryHint {
+                        Text(cleanHint(hint))
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(highlightOrange)
+                    } else if !paused.isStillPaused {
+                        Text(L("已继续", "Resumed"))
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
+            // 标题常被自动「继续」覆盖，副标题给出真正在做什么
+            if let preview = paused.lastUserMessage, !preview.isEmpty {
+                Text(preview)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
         }
-        // 已继续过的整行淡化，与卡住的拉开对比
-        .opacity(showRecovery && !paused.isStillPaused ? 0.55 : 1)
+        .padding(.vertical, 5)
+        .padding(.horizontal, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(Color.white.opacity(0.55))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .strokeBorder(Color.black.opacity(0.05), lineWidth: 1)
+        )
+        .opacity(showRecovery && !paused.isStillPaused ? 0.6 : 1)
         .contentShape(Rectangle())
         // 双击在 Codex 中打开该对话
         .onTapGesture(count: 2) {

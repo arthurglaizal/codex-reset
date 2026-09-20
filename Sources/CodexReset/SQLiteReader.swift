@@ -16,6 +16,8 @@ struct PausedThread {
     /// 该失败轮次是否仍是对话的最后一轮。
     /// false 表示失败之后对话已被继续过，不再真正卡住（旧版本会把这类对话误报为暂停）。
     var isStillPaused: Bool = false
+    /// 该对话最后一条用户消息的开头，用作副标题（标题常被自动「继续」覆盖，看不出在做什么）
+    var lastUserMessage: String? = nil
 }
 
 final class SQLiteReader {
@@ -54,6 +56,7 @@ final class SQLiteReader {
             args: [limit]
         ) else { return [] }
 
+        let previews = lastUserMessages()
         var result: [PausedThread] = []
         for row in rows {
             let threadId = row[0] as? String ?? ""
@@ -68,7 +71,8 @@ final class SQLiteReader {
             let hint = Self.extractRecoveryHint(from: errorJson)
             result.append(PausedThread(threadId: threadId, title: title, cwd: cwd,
                                        recoveryHint: hint, failedAt: failedAt,
-                                       isStillPaused: isStillPaused))
+                                       isStillPaused: isStillPaused,
+                                       lastUserMessage: previews[threadId]))
         }
         return result
     }
@@ -83,6 +87,7 @@ final class SQLiteReader {
             LIMIT ?
         """, args: [limit]) else { return [] }
 
+        let previews = lastUserMessages()
         var result: [PausedThread] = []
         for row in rows {
             let threadId = row[0] as? String ?? ""
@@ -92,9 +97,50 @@ final class SQLiteReader {
             guard !threadId.isEmpty else { continue }
             let title = displayTitle(threadId: threadId, stateTitle: rawTitle)
             result.append(PausedThread(threadId: threadId, title: title, cwd: cwd,
-                                       recoveryHint: nil, failedAt: updatedAt))
+                                       recoveryHint: nil, failedAt: updatedAt,
+                                       isStillPaused: false,
+                                       lastUserMessage: previews[threadId]))
         }
         return result
+    }
+
+    /// 每个线程最后一条 userMessage 的开头，一次查询取全部（逐条查会打开 126 次库）。
+    /// 只保留前 500 字，超出部分由界面省略。
+    func lastUserMessages() -> [String: String] {
+        guard let rows = queryRows(path: threadHistoryPath, sql: """
+            SELECT i.thread_id, i.item_json
+            FROM thread_items i
+            JOIN (
+                SELECT thread_id, MAX(rollout_ordinal) AS last_ord
+                FROM thread_items
+                WHERE item_type = 'userMessage'
+                GROUP BY thread_id
+            ) m ON m.thread_id = i.thread_id AND i.rollout_ordinal = m.last_ord
+            WHERE i.item_type = 'userMessage'
+        """) else { return [:] }
+
+        var result: [String: String] = [:]
+        for row in rows {
+            guard let threadId = row[0] as? String, !threadId.isEmpty,
+                  let json = row[1] as? String,
+                  let text = Self.extractText(fromItemJSON: json) else { continue }
+            result[threadId] = text
+        }
+        return result
+    }
+
+    /// 从 thread_items.item_json 里取出用户消息正文
+    static func extractText(fromItemJSON json: String) -> String? {
+        guard let data = json.data(using: .utf8),
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let content = obj["content"] as? [[String: Any]] else { return nil }
+        let text = content
+            .compactMap { $0["text"] as? String }
+            .joined(separator: " ")
+            .replacingOccurrences(of: "\n", with: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return nil }
+        return String(text.prefix(500))
     }
 
     /// 判断是否为子代理线程（state 库 source 以 {"subagent" 开头）
