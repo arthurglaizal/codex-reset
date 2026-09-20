@@ -552,6 +552,16 @@ struct ContentView: View {
         .help(isOpen ? L("收起", "Collapse") : L("展开", "Expand"))
     }
 
+    /// Chaque module s'ouvre sur une phrase qui dit ce qu'il contient,
+    /// suivie du rappel du double-clic (sinon personne ne le decouvre).
+    private func sectionHint(_ text: String) -> some View {
+        Text(text + " " + L("双击任意对话可在 Codex 中打开。",
+                            "Double-click a chat to open it in Codex."))
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
     private var pausedSection: some View {
         let isOpen = openSection == .paused
         let threads = matchingSearch(pausedThreads)
@@ -560,6 +570,8 @@ struct ContentView: View {
                                      "Paused chats (\(pausedThreads.count))"),
                             section: .paused, isOpen: isOpen)
             if isOpen {
+                sectionHint(L("这些对话在用量上限处停下，之后没有被继续过。",
+                              "These chats stopped on a usage limit and were never continued since."))
                 HStack(spacing: 8) {
                     selectAllCheckbox
                     searchField
@@ -588,10 +600,8 @@ struct ContentView: View {
                                      "Already continued (\(continuedThreads.count))"),
                             section: .continued, isOpen: isOpen)
             if isOpen {
-                Text(L("这些对话在触发用量上限后又被继续过，无需再次继续",
-                       "These chats were continued after hitting the limit. They don't need resuming."))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                sectionHint(L("这些对话在触发用量上限后又被继续过，无需再次继续。",
+                              "These chats were continued after hitting the limit. They don't need resuming."))
                 searchField
                 let threads = matchingSearch(continuedThreads)
                 if continuedThreads.isEmpty {
@@ -655,6 +665,8 @@ struct ContentView: View {
             }
 
             if isOpen {
+                sectionHint(L("Codex 里的全部对话，勾选后同样会参与自动继续。",
+                              "Every chat Codex knows about. Tick any of them to have it continued too."))
                 searchField
                 let threads = matchingSearch(model.allThreads)
                 if threads.isEmpty {
