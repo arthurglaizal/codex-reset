@@ -79,6 +79,16 @@ Two channels, most reliable first:
 
 ## Install & run
 
+### Download the app
+
+Grab the latest `CodexReset-macOS-*.zip` from
+[Releases](https://github.com/arthurglaizal/codex-reset/releases), unzip it and
+drag **CodexReset.app** into Applications.
+
+The build is not signed with an Apple Developer ID, so the first launch is
+refused. Open **System Settings → Privacy & Security**, scroll to the bottom and
+click **Open Anyway**. Once only.
+
 ### Build
 
 ```bash
