@@ -780,30 +780,45 @@ struct ContentView: View {
     }
 
     /// 忽略 / 恢复按钮。
-    /// 刻意用不对称的一对：眼睛图标说的是「看不看得见」，这里做的却是
-    /// 「要不要自动继续」，而且对称的开关无法分辨图标描述的是现状还是动作。
+    /// 刻意用不对称的一对：减号表示「从列表里拿走」，加号表示「放回去」，
+    /// 对称的开关无法分辨图标描述的是现状还是动作。
     @ViewBuilder
     private func ignoreButton(_ paused: PausedThread) -> some View {
         if isIgnored(paused) {
-            // 「已忽略」列表里有地方放文字，比任何图标都清楚
-            Button(L("恢复", "Restore")) {
+            inlineButton(symbol: "plus.circle",
+                         title: L("恢复", "Restore"),
+                         help: L("把这条对话放回原来的列表", "Put this chat back in its list")) {
                 model.setIgnored(false, threadId: paused.threadId)
             }
-            .font(.caption)
-            .help(L("把这条对话放回原来的列表", "Put this chat back in its list"))
         } else {
-            Button {
+            inlineButton(symbol: "minus.circle",
+                         title: L("忽略", "Ignore"),
+                         help: L("忽略这条对话：不再出现在列表，也不会被自动继续",
+                                 "Ignore this chat: it leaves the lists and is never continued automatically")) {
                 model.setIgnored(true, threadId: paused.threadId)
-            } label: {
-                Image(systemName: "minus.circle")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
             }
-            .buttonStyle(.plain)
-            .help(L("忽略这条对话：不再出现在列表，也不会被自动继续",
-                    "Ignore this chat: it leaves the lists and is never continued automatically"))
-            .accessibilityLabel(L("忽略这条对话", "Ignore this chat"))
         }
+    }
+
+    /// 行内小按钮：图标 + 文字的细边胶囊，和状态胶囊同一族，但留空心以示可点
+    private func inlineButton(symbol: String, title: String, help: String,
+                              action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 4) {
+                Image(systemName: symbol)
+                    .font(.system(size: 10, weight: .semibold))
+                Text(title)
+                    .font(.system(size: 10, weight: .medium))
+            }
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 2)
+            .overlay(Capsule().strokeBorder(Color.black.opacity(0.16), lineWidth: 1))
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .help(help)
+        .accessibilityLabel(title)
     }
 
     /// 状态胶囊：图标 + 文字同色，贴在行尾。
@@ -854,9 +869,6 @@ struct ContentView: View {
                     .monospacedDigit()
             }
             .foregroundStyle(.secondary)
-            .padding(.horizontal, 5)
-            .padding(.vertical, 2)
-            .background(Capsule().fill(Color.black.opacity(0.05)))
             .help(L("该对话共 \(count) 轮", "\(count) turns in this chat"))
         }
     }
