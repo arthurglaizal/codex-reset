@@ -33,51 +33,51 @@ struct Palette {
                : Color(red: 0.72, green: 0.33, blue: 0.10)
     }
     var buttonText: Color {
-        isDark ? Color(red: 0.122, green: 0.118, blue: 0.114) : .white
+        isDark ? Color(red: 0.082, green: 0.082, blue: 0.082) : .white
     }
-    /// 面板底色。深色取暖灰而非中性灰，纯灰在暖色强调色旁边会发蓝。
+    /// 面板底色。深色取自 Claude Code 桌面端：接近纯黑的中性灰，不带色偏。
     var windowBackground: Color {
-        isDark ? Color(red: 0.122, green: 0.118, blue: 0.114)   // #1F1E1D
+        isDark ? Color(red: 0.082, green: 0.082, blue: 0.082)   // #151515
                : Color(red: 0.95, green: 0.945, blue: 0.93)
     }
     /// 卡片底色（自动继续 / 用量分析）
     var cardBackground: Color {
-        isDark ? Color(red: 0.149, green: 0.149, blue: 0.141)   // #262624
+        isDark ? Color(red: 0.102, green: 0.102, blue: 0.102)   // #1A1A1A
                : .white
     }
     /// 列表里每条对话的底色
     var rowFill: Color {
-        isDark ? Color(red: 0.173, green: 0.173, blue: 0.165)
+        isDark ? Color(red: 0.129, green: 0.129, blue: 0.129)   // #212121
                : Color.white.opacity(0.55)
     }
     /// 分隔线、卡片描边
     var hairline: Color {
-        isDark ? Color(red: 0.227, green: 0.227, blue: 0.216)   // #3A3A37
+        isDark ? Color(red: 0.165, green: 0.165, blue: 0.165)   // #2A2A2A
                : Color.black.opacity(0.05)
     }
     /// 可点控件的描边，比 hairline 明显一点
     var controlBorder: Color {
-        isDark ? Color(red: 0.310, green: 0.306, blue: 0.290)
+        isDark ? Color(red: 0.200, green: 0.200, blue: 0.200)   // #333333
                : Color.black.opacity(0.16)
     }
     /// 搜索框底色
     var fieldFill: Color {
-        isDark ? Color(red: 0.188, green: 0.188, blue: 0.180)   // #30302E
+        isDark ? Color(red: 0.129, green: 0.129, blue: 0.129)   // #212121
                : Color.white.opacity(0.75)
     }
     /// 量表的空槽
     var gaugeTrack: Color {
-        isDark ? Color(red: 0.188, green: 0.188, blue: 0.180)
+        isDark ? Color(red: 0.149, green: 0.149, blue: 0.149)   // #262626
                : Color.black.opacity(0.06)
     }
     /// 悬停卡片底色
     var hoverBackground: Color {
-        isDark ? Color(red: 0.165, green: 0.165, blue: 0.157)
+        isDark ? Color(red: 0.118, green: 0.118, blue: 0.118)   // #1E1E1E
                : Color(red: 0.99, green: 0.985, blue: 0.975)
     }
     /// 日志区底色
     var wellBackground: Color {
-        isDark ? Color(red: 0.102, green: 0.102, blue: 0.098)
+        isDark ? Color(red: 0.067, green: 0.067, blue: 0.067)   // #111111
                : Color.black.opacity(0.03)
     }
 
