@@ -22,6 +22,12 @@ final class AppModel: ObservableObject {
     @Published var allThreads: [PausedThread] = []
     /// 勾选、需要在恢复后自动继续的对话
     @Published var selectedThreadIds: Set<String> = []
+    /// 被忽略的对话：不出现在任何列表里，也永远不会被自动继续
+    @Published var ignoredThreadIds: Set<String> {
+        didSet {
+            UserDefaults.standard.set(Array(ignoredThreadIds), forKey: "ignoredThreadIds")
+        }
+    }
     @Published var logLines: [LogEntry] = []
     /// 自动继续模式：三者互斥
     enum AutoMode: String {
@@ -80,6 +86,7 @@ final class AppModel: ObservableObject {
         self.continueCommand = UserDefaults.standard.string(forKey: "continueCommand") ?? L("继续", "Continue")
         self.remoteControlEnabled = CodexConfig.load(codexHome: codexHome).remoteControlEnabled
         self.language = UserDefaults.standard.string(forKey: "language") ?? "system"
+        self.ignoredThreadIds = Set(UserDefaults.standard.stringArray(forKey: "ignoredThreadIds") ?? [])
         engine.onLog = { [weak self] zh, en in
             Task { @MainActor in self?.appendLog(zh, en) }
         }
@@ -372,17 +379,29 @@ final class AppModel: ObservableObject {
     /// 其余模式沿用勾选列表（`立即继续` 按钮在 `.off` 下仍可手动触发）。
     private func continueTargets() -> [PausedThread] {
         if autoMode == .all {
-            return pausedThreads.filter(\.isStillPaused)
+            return pausedThreads.filter {
+                $0.isStillPaused && !ignoredThreadIds.contains($0.threadId)
+            }
         }
         var seen = Set<String>()
         var result: [PausedThread] = []
-        for t in pausedThreads where selectedThreadIds.contains(t.threadId) {
-            if seen.insert(t.threadId).inserted { result.append(t) }
-        }
-        for t in allThreads where selectedThreadIds.contains(t.threadId) {
+        for t in pausedThreads + allThreads
+        where selectedThreadIds.contains(t.threadId) && !ignoredThreadIds.contains(t.threadId) {
             if seen.insert(t.threadId).inserted { result.append(t) }
         }
         return result
+    }
+
+    /// 忽略 / 恢复一条对话（忽略时顺带取消勾选，避免留下看不见的选中项）
+    func setIgnored(_ ignored: Bool, threadId: String) {
+        if ignored {
+            ignoredThreadIds.insert(threadId)
+            selectedThreadIds.remove(threadId)
+            appendLog("已忽略对话 \(threadId)", "Ignored chat \(threadId)")
+        } else {
+            ignoredThreadIds.remove(threadId)
+            appendLog("已恢复对话 \(threadId)", "Restored chat \(threadId)")
+        }
     }
 
     /// 用量恢复检测 + 自动继续

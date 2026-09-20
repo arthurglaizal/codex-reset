@@ -17,7 +17,7 @@ struct ContentView: View {
     /// 右上角「设置」回调（由 MenuBarController 注入：打开独立设置窗口）
     private let onOpenSettings: (() -> Void)?
     /// 概览左栏同一时刻最多展开一个模块，默认「暂停的对话」；nil = 全部收起
-    private enum OverviewSection { case paused, continued, all }
+    private enum OverviewSection { case paused, continued, ignored, all }
     @State private var openSection: OverviewSection? = .paused
     /// 「暂停的对话」列表的搜索词（对话标题 + 项目路径）
     @State private var searchText = ""
@@ -72,6 +72,8 @@ struct ContentView: View {
                 pausedSection
                 Divider()
                 continuedSection
+                Divider()
+                ignoredSection
                 if showAllThreads {
                     Divider()
                     allSection
@@ -448,12 +450,23 @@ struct ContentView: View {
 
     /// 仍处于暂停的对话（列表只展示这些）
     private var pausedThreads: [PausedThread] {
-        model.pausedThreads.filter(\.isStillPaused)
+        model.pausedThreads.filter { $0.isStillPaused && !isIgnored($0) }
     }
 
     /// 暂停之后已被继续过的对话（折叠在底部，仅供核对）
     private var continuedThreads: [PausedThread] {
-        model.pausedThreads.filter { !$0.isStillPaused }
+        model.pausedThreads.filter { !$0.isStillPaused && !isIgnored($0) }
+    }
+
+    /// 被忽略的对话，可能来自任意一个列表，按 threadId 去重
+    private var ignoredThreads: [PausedThread] {
+        var seen = Set<String>()
+        return (model.pausedThreads + model.allThreads)
+            .filter { isIgnored($0) && seen.insert($0.threadId).inserted }
+    }
+
+    private func isIgnored(_ thread: PausedThread) -> Bool {
+        model.ignoredThreadIds.contains(thread.threadId)
     }
 
     /// 按对话标题或项目路径过滤
@@ -622,7 +635,35 @@ struct ContentView: View {
         .frame(maxHeight: isOpen ? .infinity : nil, alignment: .top)
     }
 
-    /// 按项目分组的滚动列表（暂停 / 已继续 / 全部对话共用）
+    /// 被忽略的对话：默认折叠，可随时恢复
+    private var ignoredSection: some View {
+        let isOpen = openSection == .ignored
+        let threads = matchingSearch(ignoredThreads)
+        return VStack(alignment: .leading, spacing: 8) {
+            accordionHeader(title: L("已忽略的对话（\(ignoredThreads.count)）",
+                                     "Ignored (\(ignoredThreads.count))"),
+                            section: .ignored, isOpen: isOpen)
+            if isOpen {
+                sectionHint(L("这些对话不会出现在其他列表，也永远不会被自动继续。",
+                              "These chats stay out of the other lists and are never continued automatically."))
+                searchField
+                if ignoredThreads.isEmpty {
+                    Text(L("暂无", "None"))
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                } else if threads.isEmpty {
+                    Text(L("没有匹配的对话", "No chat matches your search"))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    threadList(threads, showRecovery: true)
+                }
+            }
+        }
+        .frame(maxHeight: isOpen ? .infinity : nil, alignment: .top)
+    }
+
+    /// 按项目分组的滚动列表（暂停 / 已继续 / 忽略 / 全部对话共用）
     private func threadList(_ threads: [PausedThread], showRecovery: Bool) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
@@ -670,7 +711,7 @@ struct ContentView: View {
                 sectionHint(L("Codex 里的全部对话，勾选后同样会参与自动继续。",
                               "Every chat Codex knows about. Tick any of them to have it continued too."))
                 searchField
-                let threads = matchingSearch(model.allThreads)
+                let threads = matchingSearch(model.allThreads.filter { !isIgnored($0) })
                 if threads.isEmpty {
                     Text(L("没有匹配的对话", "No chat matches your search"))
                         .font(.caption)
@@ -729,11 +770,29 @@ struct ContentView: View {
                 .lineLimit(1)
             Spacer(minLength: 6)
             turnCountTag(paused.turnCount)
-            if showRecovery {
+            if showRecovery, !isIgnored(paused) {
                 statusChip(paused)
             }
+            ignoreButton(paused)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// 忽略 / 恢复按钮：忽略后这条对话从所有列表消失，自动继续也跳过它
+    private func ignoreButton(_ paused: PausedThread) -> some View {
+        let ignored = isIgnored(paused)
+        return Button {
+            model.setIgnored(!ignored, threadId: paused.threadId)
+        } label: {
+            Image(systemName: ignored ? "eye" : "eye.slash")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+        }
+        .buttonStyle(.plain)
+        .help(ignored
+              ? L("恢复这条对话", "Bring this chat back")
+              : L("忽略这条对话：不再出现在列表，也不会被自动继续",
+                  "Ignore this chat: it leaves the lists and is never continued automatically"))
     }
 
     /// 状态胶囊：图标 + 文字同色，贴在行尾。
