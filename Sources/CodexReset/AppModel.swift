@@ -118,14 +118,13 @@ final class AppModel: ObservableObject {
         Task { await connectAndBegin() }
     }
 
-    /// 杀掉残留的 "codex app-server --listen" 进程并等待其释放线程写锁。
-    /// 桌面 Codex 的 app-server 是 stdio 模式（无 --listen），不会被误杀。
+    /// 收拾上次异常退出留下的 app-server（它还占着线程库的写锁）。
+    /// 只针对我们自己记录的 PID，不按名字广撒网。
     private func cleanupOrphanAppServers() {
-        let proc = Process()
-        proc.executableURL = URL(fileURLWithPath: "/usr/bin/pkill")
-        proc.arguments = ["-f", "app-server --listen"]
-        try? proc.run()
-        Thread.sleep(forTimeInterval: 1)
+        if AppServerManager.cleanupOrphanServer() {
+            appendLog("已清理上次残留的 app-server 进程",
+                      "Cleaned up an app-server left over from a previous run")
+        }
     }
 
     func connectAndBegin() async {

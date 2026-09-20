@@ -72,6 +72,7 @@ final class AppServerManager {
         }
         try proc.run()
         ownProcess = proc
+        Self.recordPID(proc.processIdentifier)
 
         // 等待 /readyz
         let deadline = Date().addingTimeInterval(20)
@@ -82,6 +83,7 @@ final class AppServerManager {
         }
         if !ready {
             proc.terminate()
+            Self.clearRecordedPID()
             throw WebSocketClient.Error.connectionFailed("独立 app-server 启动超时: \(lastSpawnError ?? "无输出")")
         }
 
@@ -97,6 +99,89 @@ final class AppServerManager {
             proc.terminate()
         }
         ownProcess = nil
+        Self.clearRecordedPID()
+    }
+
+    // MARK: - 崩溃后残留的 app-server
+
+    /// 自起 app-server 的 PID 记录文件。
+    /// 正常退出会 terminate 子进程，但被强杀（崩溃 / 强制退出）时收不到信号，
+    /// 子进程会一直活着并占着线程库的写锁，所以把 PID 落盘，下次启动收拾它。
+    private static var pidFileURL: URL {
+        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? URL(fileURLWithPath: NSTemporaryDirectory())
+        let dir = base.appendingPathComponent("CodexReset", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir.appendingPathComponent("appserver.pid")
+    }
+
+    private static func recordPID(_ pid: Int32) {
+        try? String(pid).write(to: pidFileURL, atomically: true, encoding: .utf8)
+    }
+
+    private static func clearRecordedPID() {
+        try? FileManager.default.removeItem(at: pidFileURL)
+    }
+
+    /// 清理上次留下的 app-server。
+    /// 只处理 PID 文件里记录的那个进程，并且动手前核对命令行：
+    /// PID 会被系统复用，按名字广撒网（pkill）还可能误伤别的工具起的 app-server。
+    /// 返回是否确实清理了进程。
+    @discardableResult
+    static func cleanupOrphanServer() -> Bool {
+        guard let text = try? String(contentsOf: pidFileURL, encoding: .utf8),
+              let pid = Int32(text.trimmingCharacters(in: .whitespacesAndNewlines)),
+              pid > 0 else {
+            clearRecordedPID()
+            return false
+        }
+        defer { clearRecordedPID() }
+        guard isOurAppServer(pid) else { return false }
+
+        // node 包装进程会把信号转给真正的 codex 二进制，但强杀不会，
+        // 所以先把子进程记下来，万一父进程没来得及带走它们。
+        let children = childPIDs(of: pid)
+        kill(pid, SIGTERM)
+        for _ in 0..<20 {
+            if !isOurAppServer(pid) { break }
+            Thread.sleep(forTimeInterval: 0.1)
+        }
+        if isOurAppServer(pid) { kill(pid, SIGKILL) }
+        for child in children where isOurAppServer(child) {
+            kill(child, SIGTERM)
+        }
+        return true
+    }
+
+    /// 该 PID 是否确实是一个 `app-server --listen` 进程
+    private static func isOurAppServer(_ pid: Int32) -> Bool {
+        guard let command = commandLine(of: pid) else { return false }
+        return command.contains("app-server") && command.contains("--listen")
+    }
+
+    private static func commandLine(of pid: Int32) -> String? {
+        let output = run("/bin/ps", ["-p", String(pid), "-o", "command="])
+        return output.isEmpty ? nil : output
+    }
+
+    private static func childPIDs(of pid: Int32) -> [Int32] {
+        run("/usr/bin/pgrep", ["-P", String(pid)])
+            .split(separator: "\n")
+            .compactMap { Int32($0.trimmingCharacters(in: .whitespaces)) }
+    }
+
+    private static func run(_ path: String, _ arguments: [String]) -> String {
+        let proc = Process()
+        proc.executableURL = URL(fileURLWithPath: path)
+        proc.arguments = arguments
+        let pipe = Pipe()
+        proc.standardOutput = pipe
+        proc.standardError = FileHandle.nullDevice
+        guard (try? proc.run()) != nil else { return "" }
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        proc.waitUntilExit()
+        return String(data: data, encoding: .utf8)?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
     }
 
     // MARK: - 辅助
