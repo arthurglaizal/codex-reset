@@ -6,10 +6,11 @@ private let highlightOrange = Color(red: 0.72, green: 0.33, blue: 0.10)
 private let gaugeBarHeight: CGFloat = 128
 /// 柱子上方（标题 + 百分比）占用的高度
 private let gaugeHeaderHeight: CGFloat = 47
-/// 暂停仍是最后一轮，对话仍处于暂停
-private let pausedSymbol = "pause.circle.fill"
+/// 暂停仍是最后一轮，对话仍处于暂停。
+/// 胶囊里空间很紧，用不带外圈的图形，同样字号下符号本身更大。
+private let pausedSymbol = "pause.fill"
 /// 失败之后对话已被继续过
-private let resumedSymbol = "checkmark.circle"
+private let resumedSymbol = "checkmark"
 
 /// 主面板：单屏展示用量、倒计时、暂停对话与操作（浅色轻拟物主题）
 struct ContentView: View {
@@ -827,7 +828,7 @@ struct ContentView: View {
     private func chip(symbol: String, text: String, tint: Color, help: String) -> some View {
         HStack(spacing: 4) {
             Image(systemName: symbol)
-                .font(.system(size: 10))
+                .font(.system(size: 11, weight: .semibold))
             Text(text)
                 .font(.system(size: 10, weight: .medium))
                 .monospacedDigit()
