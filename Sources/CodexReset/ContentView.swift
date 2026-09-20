@@ -218,27 +218,21 @@ struct ContentView: View {
             Text(L("配置：", "Configuration:"))
                 .foregroundStyle(.secondary)
 
-            // 用量状态（原来占着标题栏，实际是运行状态而非标题）
-            Circle()
-                .fill(statusColor)
-                .frame(width: 7, height: 7)
-            Text(statusText)
-                .help(L("与 Codex 的连接与当前用量状态",
-                        "Connection to Codex and current usage state"))
+            configItem(ok: model.rateLimits != nil && model.connectionMode != "none",
+                       text: statusText,
+                       help: L("与 Codex 的连接状态",
+                               "Connection to Codex"))
 
             Text("·").foregroundStyle(.tertiary)
 
-            if model.accessibilityAuthorized {
-                Label(L("辅助功能已授权", "Accessibility granted"), systemImage: "checkmark.circle.fill")
-                    .foregroundStyle(.green)
-                    .help(L("GUI 兜底通道可用：无法走本地协议时改为模拟键盘输入",
-                            "The GUI fallback can type into Codex when the local protocol is unavailable"))
-            } else {
-                Label(L("辅助功能未授权", "Accessibility not granted"),
-                      systemImage: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.orange)
-                    .help(L("未授权时只能走本地协议通道",
-                            "Without it, only the local protocol channel can be used"))
+            configItem(ok: model.accessibilityAuthorized,
+                       text: model.accessibilityAuthorized
+                             ? L("辅助功能已授权", "Accessibility granted")
+                             : L("辅助功能未授权（可选）", "Accessibility not granted (optional)"),
+                       help: L("可选项：本地协议不可用时，用模拟输入在 Codex 里发送指令",
+                               "Optional: types the command into Codex when the local protocol is unavailable"))
+
+            if !model.accessibilityAuthorized {
                 Button(L("授权", "Grant")) {
                     model.openAccessibilitySettings()
                 }
@@ -253,6 +247,19 @@ struct ContentView: View {
         }
         .font(.caption)
         .lineLimit(1)
+    }
+
+    /// 「配置」行的一项：就绪=绿点，未就绪=灰叉。
+    /// 两项都不是错误，辅助功能本来就是可选的，所以未就绪也不用警告色。
+    private func configItem(ok: Bool, text: String, help: String) -> some View {
+        HStack(spacing: 5) {
+            Image(systemName: ok ? "circle.fill" : "xmark")
+                .font(.system(size: ok ? 7 : 9, weight: ok ? .regular : .semibold))
+                .foregroundStyle(ok ? Color(red: 0.10, green: 0.68, blue: 0.42) : Color.secondary)
+            Text(text)
+                .foregroundStyle(.secondary)
+        }
+        .help(help)
     }
 
     // MARK: - 状态头
@@ -284,14 +291,6 @@ struct ContentView: View {
             .buttonStyle(.plain)
             .help(L("设置", "Settings"))
         }
-    }
-
-    /// 「配置」行讲的是与 Codex 的连接是否就绪，额度本身由右侧柱子表达
-    private var statusColor: Color {
-        if model.connectionMode == "none" { return .red }
-        if model.rateLimits == nil { return .gray }
-        if (model.rateLimits?.rateLimits.primary?.usedPercent ?? 0) >= 100 { return .orange }
-        return .green
     }
 
     private var statusText: String {

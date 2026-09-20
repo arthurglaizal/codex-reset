@@ -63,7 +63,8 @@ final class MenuBarController: NSObject {
               let primary = model.rateLimits?.rateLimits.primary else {
             switch model.connectionMode {
             case "none":
-                setStatusImage(remaining: nil, bottom: "⚠️")
+                // 菜单栏不放警告图标：配置问题在面板里说，不在系统栏里喊
+                setStatusImage(remaining: nil, bottom: "–")
             default:
                 setStatusImage(remaining: nil, bottom: "…")
             }
