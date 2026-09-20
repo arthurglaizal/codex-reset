@@ -36,9 +36,12 @@ Bugs present in the original.
   `pkill -f "app-server --listen"`, which would also kill a server started by
   another tool. The spawned server's PID is now recorded and only that process
   is cleaned up, after verifying its command line.
-- **Chat titles repeated themselves**, because Codex syncs a chat's title to
-  the latest user message and the generated `# Files mentioned by the user:`
-  context block was shown verbatim.
+- **Fallback titles showed a generated context block.** When a chat has no
+  usable title, the first user message is used instead, and Codex prefixes
+  messages carrying attachments with a `# Files mentioned by the user:` block
+  followed by file paths. Several unrelated chats therefore appeared under the
+  same name. That block is now skipped, falling back to a file count when the
+  message contains nothing else.
 
 ## Added
 
@@ -58,7 +61,9 @@ Features the original does not have.
   first exchange.
 - **An "Already continued" list**, kept for checking that the detection above
   is not discarding chats it should not.
-- **A hover card** carrying the full title, which the list elides.
+- **A detail card** with the full title, which the list elides. It opens from
+  an info icon on the row rather than on hovering the row itself, so reaching
+  for a check box does not cover the list.
 - **Dark mode**, on by default, switchable in the settings window.
 
 ## Changed
@@ -67,8 +72,9 @@ Same behaviour, different presentation.
 
 - The panel is 880pt wide and split in two columns: chat lists on the left,
   automation and quota on the right.
-- The three lists are accordions, one open at a time, the open one taking all
-  remaining height instead of scrolling inside 160pt.
+- The four lists (paused, ignored, already continued, all chats) are
+  accordions, one open at a time, the open one taking all remaining height
+  instead of scrolling inside 160pt.
 - Quota is shown as **what is left**, as vertical gauges, green through orange
   to red, matching Codex's own wording.
 - Each chat is a card with a status chip, rather than a row with a loose icon
