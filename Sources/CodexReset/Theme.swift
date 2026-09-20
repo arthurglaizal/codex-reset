@@ -33,11 +33,11 @@ struct Palette {
                : Color(red: 0.72, green: 0.33, blue: 0.10)
     }
     var buttonText: Color {
-        isDark ? Color(red: 0.082, green: 0.082, blue: 0.082) : .white
+        isDark ? Color(red: 0.067, green: 0.067, blue: 0.067) : .white
     }
     /// 面板底色。深色取自 Claude Code 桌面端：接近纯黑的中性灰，不带色偏。
     var windowBackground: Color {
-        isDark ? Color(red: 0.082, green: 0.082, blue: 0.082)   // #151515
+        isDark ? Color(red: 0.067, green: 0.067, blue: 0.067)   // #111111
                : Color(red: 0.95, green: 0.945, blue: 0.93)
     }
     /// 卡片底色（自动继续 / 用量分析）
@@ -77,7 +77,7 @@ struct Palette {
     }
     /// 日志区底色
     var wellBackground: Color {
-        isDark ? Color(red: 0.067, green: 0.067, blue: 0.067)   // #111111
+        isDark ? Color(red: 0.039, green: 0.039, blue: 0.039)   // #0A0A0A
                : Color.black.opacity(0.03)
     }
 
