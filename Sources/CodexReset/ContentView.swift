@@ -770,27 +770,35 @@ struct ContentView: View {
         .onTapGesture(count: 2) {
             model.openInCodex(threadId: paused.threadId)
         }
-        .onHover { inside in
-            let id = paused.threadId
-            if inside {
-                hoverCandidate = id
-                // 停留半秒才弹，快速滑过列表时不会闪一片
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    if hoverCandidate == id { hoveredThreadId = id }
+    }
+
+    /// 信息图标：悬停它才出详情卡。
+    /// 挂在整行上的话，光是移动鼠标去勾选复选框就会弹出来挡住列表。
+    private func infoButton(_ paused: PausedThread) -> some View {
+        Image(systemName: "info.circle")
+            .font(.system(size: 11))
+            .foregroundStyle(.tertiary)
+            .onHover { inside in
+                let id = paused.threadId
+                if inside {
+                    hoverCandidate = id
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                        if hoverCandidate == id { hoveredThreadId = id }
+                    }
+                } else {
+                    if hoverCandidate == id { hoverCandidate = nil }
+                    if hoveredThreadId == id { hoveredThreadId = nil }
                 }
-            } else {
-                if hoverCandidate == id { hoverCandidate = nil }
-                if hoveredThreadId == id { hoveredThreadId = nil }
             }
-        }
-        .popover(isPresented: Binding(
-            get: { hoveredThreadId == paused.threadId },
-            set: { shown in
-                if !shown, hoveredThreadId == paused.threadId { hoveredThreadId = nil }
+            .popover(isPresented: Binding(
+                get: { hoveredThreadId == paused.threadId },
+                set: { shown in
+                    if !shown, hoveredThreadId == paused.threadId { hoveredThreadId = nil }
+                }
+            ), arrowEdge: .bottom) {
+                hoverCard(paused)
             }
-        ), arrowEdge: .bottom) {
-            hoverCard(paused)
-        }
+            .accessibilityLabel(L("对话详情", "Chat details"))
     }
 
     /// 悬停卡片：系统 tooltip 只能给一行灰字，这里要放操作提示 + 完整消息
@@ -829,6 +837,7 @@ struct ContentView: View {
                 .font(.system(size: 13, weight: .medium))
                 .lineLimit(1)
             Spacer(minLength: 6)
+            infoButton(paused)
             turnCountTag(paused.turnCount)
             if showRecovery, !isIgnored(paused) {
                 statusChip(paused)
