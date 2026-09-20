@@ -502,8 +502,8 @@ struct ContentView: View {
 
     /// 「全选」主复选框：空 / 半选 / 全选，与下方每行的复选框同列
     @ViewBuilder
-    private var selectAllCheckbox: some View {
-        let ids = Set(pausedThreads.map { $0.threadId })
+    private func selectAllCheckbox(for threads: [PausedThread]) -> some View {
+        let ids = Set(threads.map { $0.threadId })
         if !ids.isEmpty, model.autoMode != .all {
             let selected = ids.intersection(model.selectedThreadIds)
             let isAll = selected.count == ids.count
@@ -522,9 +522,9 @@ struct ContentView: View {
             .buttonStyle(.plain)
             .help(isAll
                   ? L("取消全选", "Clear selection")
-                  : L("全选暂停的对话（\(selected.count)/\(ids.count) 已选）",
-                      "Select all paused chats (\(selected.count)/\(ids.count) selected)"))
-            .accessibilityLabel(L("全选暂停的对话", "Select all paused chats"))
+                  : L("全选（\(selected.count)/\(ids.count) 已选）",
+                      "Select all (\(selected.count)/\(ids.count) selected)"))
+            .accessibilityLabel(L("全选本组对话", "Select every chat in this group"))
         }
     }
 
@@ -573,7 +573,7 @@ struct ContentView: View {
                 sectionHint(L("这些对话在用量上限处停下，之后没有被继续过。",
                               "These chats stopped on a usage limit and were never continued since."))
                 HStack(spacing: 8) {
-                    selectAllCheckbox
+                    selectAllCheckbox(for: pausedThreads)
                     searchField
                 }
                 if pausedThreads.isEmpty {
@@ -602,7 +602,10 @@ struct ContentView: View {
             if isOpen {
                 sectionHint(L("这些对话在触发用量上限后又被继续过，无需再次继续。",
                               "These chats were continued after hitting the limit. They don't need resuming."))
-                searchField
+                HStack(spacing: 8) {
+                    selectAllCheckbox(for: continuedThreads)
+                    searchField
+                }
                 let threads = matchingSearch(continuedThreads)
                 if continuedThreads.isEmpty {
                     Text(L("暂无", "None"))
@@ -712,7 +715,6 @@ struct ContentView: View {
             RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .strokeBorder(Color.black.opacity(0.05), lineWidth: 1)
         )
-        .opacity(showRecovery && !paused.isStillPaused ? 0.6 : 1)
         .contentShape(Rectangle())
         // 双击在 Codex 中打开该对话
         .onTapGesture(count: 2) {
@@ -738,21 +740,28 @@ struct ContentView: View {
             Text(paused.title)
                 .font(.system(size: 13, weight: .medium))
                 .lineLimit(1)
+            if showRecovery, !paused.isStillPaused {
+                resumedTag
+            }
             Spacer(minLength: 6)
             turnCountTag(paused.turnCount)
-            if showRecovery {
-                if paused.isStillPaused, let hint = paused.recoveryHint {
-                    Text(cleanHint(hint))
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(highlightOrange)
-                } else if !paused.isStillPaused {
-                    Text(L("已继续", "Resumed"))
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                }
+            if showRecovery, paused.isStillPaused, let hint = paused.recoveryHint {
+                Text(cleanHint(hint))
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(highlightOrange)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// 「已继续」标签：紧贴标题，卡片本身保持正常对比度
+    private var resumedTag: some View {
+        Text(L("已继续", "Resumed"))
+            .font(.system(size: 10, weight: .medium))
+            .foregroundStyle(Color(red: 0.08, green: 0.48, blue: 0.30))
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(Capsule().fill(quotaColor(100).opacity(0.14)))
     }
 
     /// 轮次计数：气泡图标 + 数字，用来区分「聊了很久」和「刚起头就停了」
