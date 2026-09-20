@@ -45,7 +45,7 @@ struct ContentView: View {
             footer
         }
         .padding(14)
-        .frame(width: 760, height: 800, alignment: .top)
+        .frame(width: 900, height: 800, alignment: .top)
         // 浅色主题：全不透明浅色背景
         .background(Color(red: 0.95, green: 0.945, blue: 0.93))
         .preferredColorScheme(.light)
