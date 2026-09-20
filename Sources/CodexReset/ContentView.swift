@@ -826,7 +826,7 @@ struct ContentView: View {
     }
 
     private func chip(symbol: String, text: String, tint: Color, help: String) -> some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 5) {
             Image(systemName: symbol)
                 .font(.system(size: 11, weight: .semibold))
             Text(text)
@@ -834,8 +834,9 @@ struct ContentView: View {
                 .monospacedDigit()
         }
         .foregroundStyle(tint)
-        .padding(.horizontal, 7)
-        .padding(.vertical, 2)
+        // 不带外圈的图形会顶到胶囊边上，靠内边距还回那几像素
+        .padding(.horizontal, 9)
+        .padding(.vertical, 3)
         .background(Capsule().fill(tint.opacity(0.12)))
         .help(help)
         .accessibilityLabel(help)
