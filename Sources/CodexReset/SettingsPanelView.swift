@@ -39,10 +39,19 @@ struct SettingsPanelView: View {
             Text(L("CodexReset · boyso/codex-reset 的 fork",
                    "CodexReset · a fork of boyso/codex-reset"))
             Text(L("界面与功能改动：Arturo UX", "Interface and features by Arturo UX"))
+            if let version = appVersion {
+                Text(L("版本 \(version)", "Version \(version)"))
+            }
         }
         .font(.system(size: 10))
         .foregroundStyle(.tertiary)
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// 版本号取自 bundle 的 Info.plist。`swift run` 下没有 bundle，
+    /// 读不到就不显示这一行，而不是印一个假的占位版本。
+    private var appVersion: String? {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
     }
 
     /// 语言选择绑定到 AppModel.language（切换后经 objectWillChange 刷新全界面）

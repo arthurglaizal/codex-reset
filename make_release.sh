@@ -8,7 +8,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-VERSION="${1:-1.1.0}"
+VERSION="${1:-1.1.1}"
 APP_NAME="CodexReset"
 DIST="dist"
 STAGE="$DIST/stage"
@@ -35,6 +35,11 @@ APP="$STAGE/$APP_NAME.app"
 
 # bundle 里那份也是重新生成的，一并换回来
 cp "$ICON" "$APP/Contents/Resources/AppIcon.icns"
+
+# 版本号注入 bundle：设置面板显示的就是它。不注入的话 Resources/Info.plist
+# 里那个手写的数字迟早和 zip 的名字对不上（1.1.0 的包里躺着 1.0.0）。
+echo "==> 写入版本号 $VERSION"
+/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$APP/Contents/Info.plist"
 
 # 重新做 ad-hoc 签名。make_app.sh 会优先用本机的 Apple Development 证书，
 # 但那种证书一旦吊销，下载方的 macOS 会直接判定为恶意软件，而不是普通的
