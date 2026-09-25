@@ -212,9 +212,11 @@ final class AutoContinueEngine {
     /// 轮询 turn 状态，直到非 inProgress/queued（completed/failed/interrupted）
     private static func waitTurnCompletion(client: AppServerClient, threadId: String, turnId: String) async {
         let deadline = Date().addingTimeInterval(6 * 3600) // 最多 6 小时
+        var consecutiveFailures = 0
         while Date() < deadline {
             do {
                 let dict = try await client.request("thread/turns/list", params: ["threadId": threadId])
+                consecutiveFailures = 0
                 if let data = dict["data"] as? [[String: Any]],
                    let turn = data.first(where: { ($0["id"] as? String) == turnId }),
                    let status = turn["status"] as? String,
@@ -222,9 +224,15 @@ final class AutoContinueEngine {
                     return
                 }
             } catch {
-                return
+                // 一次查询失败多半只是抖动。以前这里直接 return，于是调用方
+                // 立刻去 unsubscribe 一个还在跑的 turn，写锁反而留在原地。
+                consecutiveFailures += 1
+                if consecutiveFailures >= Self.maxTurnPollFailures { return }
             }
             try? await Task.sleep(nanoseconds: 10_000_000_000) // 每 10 秒查一次
         }
     }
+
+    /// 连续这么多次查询失败才认定连接没了（每次间隔 10 秒）
+    private static let maxTurnPollFailures = 3
 }
