@@ -100,6 +100,13 @@ final class AutoContinueEngine {
         handledThreads.contains(threadId)
     }
 
+    /// 清空「已处理」记录。
+    /// `handledThreads` 只是防止同一个窗口内重复发送「继续」，
+    /// 不该跨窗口生效：用量重置后同一个对话必须能再次被自动继续。
+    func resetHandled() {
+        handledThreads.removeAll()
+    }
+
     /// 继续指定线程。返回是否成功。
     /// - Parameters:
     ///   - client: 当前已连接的 app-server 客户端（可能是桌面 control 或独立实例）

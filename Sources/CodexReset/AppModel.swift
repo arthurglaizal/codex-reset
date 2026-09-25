@@ -414,6 +414,9 @@ final class AppModel: ObservableObject {
 
         if recovered {
             appendLog("检测到用量恢复！usedPercent=\(primary?.usedPercent ?? -1)%", "Usage recovered! usedPercent=\(primary?.usedPercent ?? -1)%")
+            // 新窗口开始：清空上一个窗口的「已处理」记录，
+            // 否则一个对话在本次运行里只会被自动继续一次。
+            engine.resetHandled()
             notify(title: L("Codex 用量已恢复", "Codex usage recovered"),
                    body: L("正在自动继续上次暂停的对话…", "Continuing the paused chats…"))
             Task { await autoContinueIfNeeded() }
