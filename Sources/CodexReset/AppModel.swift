@@ -355,6 +355,11 @@ final class AppModel: ObservableObject {
             return
         }
         resetHistory = history
+        // 最新一条记的就是上次观测到的窗口。不接上它的话，每次启动都会
+        // 把当前这个窗口当成新窗口再记一遍，历史里全是重复项。
+        if let latest = history.first {
+            lastResetsAt = Int(latest.nextResetAt.timeIntervalSince1970)
+        }
     }
 
     private func saveResetHistory() {
