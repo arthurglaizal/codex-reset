@@ -230,18 +230,58 @@ final class AppServerManager {
     }
 
     static func codexBinaryPath() -> String {
-        // 优先使用真实的原生二进制，避免 node 包装器在 launchd 等最小环境下找不到 node
-        let vendorBinary = "/usr/local/lib/node_modules/@openai/codex/node_modules/@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/bin/codex"
-        let candidates = [
-            ProcessInfo.processInfo.environment["CODEX_CLI_PATH"],
-            vendorBinary,
-            "/usr/local/bin/codex",
-            "/opt/homebrew/bin/codex",
-            "/Applications/Codex.app/Contents/Resources/codex"
-        ]
-        for path in candidates.compactMap({ $0 }) where FileManager.default.isExecutableFile(atPath: path) {
+        if let explicit = ProcessInfo.processInfo.environment["CODEX_CLI_PATH"],
+           FileManager.default.isExecutableFile(atPath: explicit) {
+            return explicit
+        }
+        // 原生二进制优先，理由有二：node 包装器在 launchd 等最小环境下找不到 node，
+        // 而且 terminate 只打到 node 本身 —— 真正的 app-server 是它的子进程，
+        // 会活下来继续占着线程写锁，Codex 桌面 app 就打不开那个对话了。
+        for path in nativeBinaryCandidates() where FileManager.default.isExecutableFile(atPath: path) {
+            return path
+        }
+        for path in shimCandidates() where FileManager.default.isExecutableFile(atPath: path) {
             return path
         }
         return "/usr/local/bin/codex"
+    }
+
+    /// 原生 codex 二进制的候选路径：npm 全局安装目录（前缀因安装方式而异）下的
+    /// vendor 二进制，以及 Codex 桌面 app 自带的那一份。
+    private static func nativeBinaryCandidates() -> [String] {
+        let home = NSHomeDirectory()
+        let vendorSuffix = "/@openai/codex/node_modules/@openai/codex-darwin-\(npmArch)"
+            + "/vendor/\(rustTriple)/bin/codex"
+        let nodeModuleRoots = [
+            home + "/.local/lib/node_modules",
+            home + "/.npm-global/lib/node_modules",
+            "/usr/local/lib/node_modules",
+            "/opt/homebrew/lib/node_modules"
+        ]
+        return nodeModuleRoots.map { $0 + vendorSuffix } + [
+            "/Applications/ChatGPT.app/Contents/Resources/codex",
+            "/Applications/Codex.app/Contents/Resources/codex"
+        ]
+    }
+
+    /// node 包装脚本。找不到原生二进制时才用，信号转发不可靠。
+    private static func shimCandidates() -> [String] {
+        ["/usr/local/bin/codex", "/opt/homebrew/bin/codex"]
+    }
+
+    private static var npmArch: String {
+        #if arch(arm64)
+        return "arm64"
+        #else
+        return "x64"
+        #endif
+    }
+
+    private static var rustTriple: String {
+        #if arch(arm64)
+        return "aarch64-apple-darwin"
+        #else
+        return "x86_64-apple-darwin"
+        #endif
     }
 }
